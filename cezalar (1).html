@@ -1,0 +1,1500 @@
+const express = require('express');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { sendRconCommand } = require('./lib/rcon');
+
+// Basit .env yükleyici: ekstra paket gerektirmez.
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    if (!line || line.trim().startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (!process.env[key]) process.env[key] = value;
+  }
+}
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+// Geçici modlar:
+// - free: PayTR kapalıdır, ödeme almadan test siparişi oluşturur.
+// - paytr: PayTR ile gerçek/test ödeme akışı çalışır.
+const SHOP_MODE = String(process.env.SHOP_MODE || 'free').toLowerCase();
+const USERS_FILE = path.join(__dirname, 'users.txt');
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'cyanidenw-admin-local-secret';
+const LOGS_FILE = path.join(__dirname, 'data', 'site-logs.json');
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use((req, res, next) => {
+  const started = Date.now();
+  res.on('finish', () => {
+    appendLog('request', {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - started,
+      ip: getClientIp(req),
+      userAgent: req.headers['user-agent'] || '',
+    });
+  });
+  next();
+});
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const DATA_DIR = path.join(__dirname, 'data');
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const ADMINS_FILE = path.join(DATA_DIR, 'admins.json');
+const PUNISHMENTS_FILE = path.join(DATA_DIR, 'punishments.json');
+const SUPPORT_REPLIES_FILE = path.join(DATA_DIR, 'support-replies.json');
+const SUPPORT_TICKETS_FILE = path.join(DATA_DIR, 'support-tickets.json');
+const APPLICATIONS_FILE = path.join(DATA_DIR, 'applications.json');
+const APPLICATION_CODES_FILE = path.join(DATA_DIR, 'application-codes.json');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]');
+if (!fs.existsSync(ADMINS_FILE)) fs.writeFileSync(ADMINS_FILE, '[]');
+if (!fs.existsSync(PUNISHMENTS_FILE)) fs.writeFileSync(PUNISHMENTS_FILE, '[]');
+if (!fs.existsSync(SUPPORT_REPLIES_FILE)) fs.writeFileSync(SUPPORT_REPLIES_FILE, '[]');
+if (!fs.existsSync(SUPPORT_TICKETS_FILE)) fs.writeFileSync(SUPPORT_TICKETS_FILE, '[]');
+if (!fs.existsSync(APPLICATIONS_FILE)) fs.writeFileSync(APPLICATIONS_FILE, '[]');
+if (!fs.existsSync(APPLICATION_CODES_FILE)) fs.writeFileSync(APPLICATION_CODES_FILE, '[]');
+if (!fs.existsSync(LOGS_FILE)) fs.writeFileSync(LOGS_FILE, '[]');
+if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '');
+
+const BUILT_IN_ADMINS = [
+  {
+    username: 'emitgnicar',
+    password: 'nwedinayc',
+    displayName: 'racing_time',
+    role: 'full',
+    permissions: ['orders', 'support', 'applications', 'punishments', 'admins'],
+  },
+  {
+    username: 'beyllomem',
+    password: 'agnatilletnad7792',
+    displayName: 'memollbey',
+    role: 'full',
+    permissions: ['orders', 'support', 'applications', 'punishments', 'admins'],
+  },
+  {
+    username: 'berehreh.d',
+    password: 'enihayedikermindez',
+    displayName: 'cyanideNW ekibi',
+    role: 'staff',
+    permissions: ['support', 'punishments'],
+  },
+];
+
+const PRODUCTS = {
+  vip: {
+    id: 'vip',
+    name: 'VIP',
+    priceTl: 75,
+    group: process.env.VIP_GROUP || 'vip',
+  },
+  vipplus: {
+    id: 'vipplus',
+    name: 'VIP+',
+    priceTl: 150,
+    group: process.env.VIP_PLUS_GROUP || 'vipplus',
+  },
+  mvip: {
+    id: 'mvip',
+    name: 'MVIP',
+    priceTl: 200,
+    group: process.env.MVIP_GROUP || 'mvip',
+  },
+  mvipplus: {
+    id: 'mvipplus',
+    name: 'MVIP+',
+    priceTl: 250,
+    group: process.env.MVIP_PLUS_GROUP || 'mvipplus',
+  },
+  sponsor: {
+    id: 'sponsor',
+    name: 'Sponsor',
+    priceTl: 500,
+    group: process.env.SPONSOR_GROUP || 'sponsor',
+  },
+  cyanidecase: {
+    id: 'cyanidecase',
+    name: 'Cyanide Kasası',
+    priceTl: 150,
+    group: process.env.CYANIDE_CASE_GROUP || 'cyanidekasasi',
+  },
+  vipcase: {
+    id: 'vipcase',
+    name: 'VIP Kasası',
+    priceTl: 100,
+    group: process.env.VIP_CASE_GROUP || 'vipkasasi',
+  },
+  kitcase: {
+    id: 'kitcase',
+    name: 'Kit Kasası',
+    priceTl: 75,
+    group: process.env.KIT_CASE_GROUP || 'kitkasasi',
+  },
+  pickaxecase: {
+    id: 'pickaxecase',
+    name: 'Kazma Kasası',
+    priceTl: 50,
+    group: process.env.PICKAXE_CASE_GROUP || 'kazmakasasi',
+  },
+};
+
+function readOrders() {
+  try { return JSON.parse(fs.readFileSync(ORDERS_FILE, 'utf8')); }
+  catch { return []; }
+}
+
+function readJson(file, fallback = []) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return fallback; }
+}
+
+function writeJson(file, value) {
+  fs.writeFileSync(file, JSON.stringify(value, null, 2));
+}
+
+function appendLog(type, details = {}) {
+  try {
+    const dir = path.dirname(LOGS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const logs = readJson(LOGS_FILE);
+    logs.push({
+      id: 'LG' + Date.now().toString(36).toUpperCase() + crypto.randomBytes(2).toString('hex').toUpperCase(),
+      type,
+      details,
+      created_at: new Date().toISOString(),
+    });
+    writeJson(LOGS_FILE, logs.slice(-1000));
+  } catch {
+    // Logging should never break the site.
+  }
+}
+
+function writeOrders(orders) {
+  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+}
+
+function updateOrder(merchantOid, updater) {
+  const orders = readOrders();
+  const index = orders.findIndex(o => o.merchant_oid === merchantOid);
+  if (index === -1) return null;
+  orders[index] = updater(orders[index]);
+  writeOrders(orders);
+  return orders[index];
+}
+
+function readUsers() {
+  try {
+    const content = fs.readFileSync(USERS_FILE, 'utf8').trim();
+    if (!content) return [];
+    return content.split(/\r?\n/).map(line => {
+      const [username, email, password, timestamp] = line.split('|');
+      return { username, email, password, timestamp };
+    }).filter(user => user.username);
+  } catch {
+    return [];
+  }
+}
+
+function publicUser(user) {
+  return {
+    username: user.username,
+    email: user.email,
+    timestamp: user.timestamp,
+  };
+}
+
+function signUserToken(user) {
+  const payload = Buffer.from(JSON.stringify({
+    username: user.username,
+    email: user.email,
+    iat: Date.now(),
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyUserToken(token) {
+  if (!token || !token.includes('.')) return null;
+  const [payload, signature] = token.split('.');
+  const expected = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
+  if (signature.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const user = readUsers().find(item => item.username === data.username && item.email === data.email);
+    return user ? publicUser(user) : null;
+  } catch {
+    return null;
+  }
+}
+
+function requireUser(req, res, next) {
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const user = verifyUserToken(token);
+  if (!user) return res.status(401).json({ error: 'Kullanıcı girişi gerekli.' });
+  req.user = user;
+  next();
+}
+
+function readAdmins() {
+  return [...BUILT_IN_ADMINS, ...readJson(ADMINS_FILE)];
+}
+
+function publicAdmin(admin) {
+  return {
+    username: admin.username,
+    displayName: admin.displayName,
+    role: admin.role,
+    permissions: admin.permissions,
+  };
+}
+
+function findAdmin(username, password) {
+  return readAdmins().find(admin => admin.username === username && admin.password === password);
+}
+
+function signAdminToken(admin) {
+  const payload = Buffer.from(JSON.stringify({
+    username: admin.username,
+    displayName: admin.displayName,
+    role: admin.role,
+    permissions: admin.permissions,
+    iat: Date.now(),
+  })).toString('base64url');
+  const signature = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function verifyAdminToken(token) {
+  if (!token || !token.includes('.')) return null;
+  const [payload, signature] = token.split('.');
+  const expected = crypto.createHmac('sha256', ADMIN_SECRET).update(payload).digest('base64url');
+  if (signature.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const admin = readAdmins().find(item => item.username === data.username);
+    if (!admin) return null;
+    return publicAdmin(admin);
+  } catch {
+    return null;
+  }
+}
+
+function requireAdmin(permission) {
+  return (req, res, next) => {
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const admin = verifyAdminToken(token);
+    if (!admin) return res.status(401).json({ error: 'Admin girişi gerekli.' });
+    if (permission && !admin.permissions.includes(permission)) {
+      return res.status(403).json({ error: 'Bu bölüm için yetkiniz yok.' });
+    }
+    req.admin = admin;
+    next();
+  };
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return String(forwarded).split(',')[0].trim();
+  return req.socket.remoteAddress?.replace('::ffff:', '') || '127.0.0.1';
+}
+
+function safeMinecraftName(name) {
+  const cleaned = String(name || '').trim();
+  return /^[a-zA-Z0-9_]{3,16}$/.test(cleaned) ? cleaned : null;
+}
+
+function makeMerchantOid() {
+  return 'CNW' + Date.now() + crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+function makePaytrTokenForPayment({ merchant_id, user_ip, merchant_oid, email, payment_amount, user_basket, no_installment, max_installment, currency, test_mode }) {
+  const hashStr = `${merchant_id}${user_ip}${merchant_oid}${email}${payment_amount}${user_basket}${no_installment}${max_installment}${currency}${test_mode}`;
+  return crypto.createHmac('sha256', process.env.PAYTR_MERCHANT_KEY || '')
+    .update(hashStr + (process.env.PAYTR_MERCHANT_SALT || ''))
+    .digest('base64');
+}
+
+function verifyPaytrCallback(body) {
+  const tokenStr = `${body.merchant_oid}${process.env.PAYTR_MERCHANT_SALT || ''}${body.status}${body.total_amount}`;
+  const token = crypto.createHmac('sha256', process.env.PAYTR_MERCHANT_KEY || '')
+    .update(tokenStr)
+    .digest('base64');
+  return token === body.hash;
+}
+
+async function giveMinecraftRank(order) {
+  const command = `lp user ${order.minecraft_username} parent add ${order.product.group}`;
+
+  if (String(process.env.RCON_ENABLED).toLowerCase() !== 'true') {
+    return { executed: false, command, message: 'RCON_ENABLED=false olduğu için komut sadece hazırlandı.' };
+  }
+
+  const response = await sendRconCommand({
+    host: process.env.RCON_HOST,
+    port: process.env.RCON_PORT,
+    password: process.env.RCON_PASSWORD,
+    command,
+  });
+
+  return { executed: true, command, response };
+}
+
+const DELIVERY_RETRY_MS = Number(process.env.DELIVERY_RETRY_MS || 5 * 60 * 1000);
+const activeDeliveries = new Set();
+
+function deliveryCommand(order) {
+  // Varsayılan kredi teslimat komutu. .env içinden değiştirebilirsin:
+  // MINECRAFT_DELIVERY_COMMAND_TEMPLATE=credits give {player} {credits}
+  // Kullanılabilir değişkenler: {player}, {credits}, {product}, {selected_product}
+  const template = process.env.MINECRAFT_DELIVERY_COMMAND_TEMPLATE || 'credits give {player} {credits}';
+  return template
+    .replaceAll('{player}', order.minecraft_username || '')
+    .replaceAll('{username}', order.minecraft_username || '')
+    .replaceAll('{credits}', String(order.credits || order.product?.priceTl || 0))
+    .replaceAll('{product}', order.product?.id || '')
+    .replaceAll('{selected_product}', order.selected_product?.id || '');
+}
+
+function responseLooksSuccessful(response) {
+  const text = typeof response === 'string' ? response : JSON.stringify(response || {});
+  const lower = text.toLowerCase();
+  const failureWords = [
+    'not online',
+    'offline',
+    'not found',
+    'could not find',
+    'unknown player',
+    'oyunda değil',
+    'bulunamad',
+    'failed',
+    'error',
+  ];
+  return !failureWords.some(word => lower.includes(word));
+}
+
+async function runMinecraftCommand(command) {
+  if (process.env.MINECRAFT_COMMAND_API_URL) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (process.env.MINECRAFT_COMMAND_API_KEY) {
+      headers.Authorization = `Bearer ${process.env.MINECRAFT_COMMAND_API_KEY}`;
+    }
+    const response = await fetch(process.env.MINECRAFT_COMMAND_API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ command }),
+    });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { message: text }; }
+    const ok = response.ok && data.success !== false && responseLooksSuccessful(data);
+    return { transport: 'http', ok, response: data, status: response.status };
+  }
+
+  if (String(process.env.RCON_ENABLED).toLowerCase() !== 'true') {
+    return {
+      transport: 'none',
+      ok: false,
+      response: 'MINECRAFT_COMMAND_API_URL veya RCON_ENABLED=true ayarlı değil.',
+    };
+  }
+
+  const response = await sendRconCommand({
+    host: process.env.RCON_HOST,
+    port: process.env.RCON_PORT,
+    password: process.env.RCON_PASSWORD,
+    command,
+  });
+
+  return { transport: 'rcon', ok: responseLooksSuccessful(response), response };
+}
+
+function makeQueuedDelivery(order, extra = {}) {
+  return {
+    status: order.minecraft_username ? 'queued' : 'waiting_minecraft',
+    command: order.minecraft_username ? deliveryCommand(order) : null,
+    attempts: 0,
+    next_attempt_at: order.minecraft_username ? new Date().toISOString() : null,
+    last_attempt_at: null,
+    completed_at: null,
+    last_error: null,
+    response: null,
+    ...extra,
+  };
+}
+
+async function attemptOrderDelivery(order) {
+  if (!order || order.status !== 'success' || !order.minecraft_username) return null;
+  if (order.delivery?.status === 'delivered') return order.delivery;
+  if (activeDeliveries.has(order.merchant_oid)) return order.delivery || null;
+
+  activeDeliveries.add(order.merchant_oid);
+  const now = new Date();
+  const delivery = order.delivery?.status ? order.delivery : makeQueuedDelivery(order);
+  const attempts = Number(delivery.attempts || 0) + 1;
+  const command = deliveryCommand(order);
+
+  if (!command.trim()) {
+    const waitingDelivery = {
+      ...delivery,
+      status: 'waiting_command',
+      command: '',
+      attempts: 0,
+      next_attempt_at: null,
+      last_attempt_at: null,
+      completed_at: null,
+      last_error: 'Oyun içi teslimat komutu henüz server.js içindeki deliveryCommand fonksiyonuna yazılmadı.',
+    };
+    updateOrder(order.merchant_oid, current => ({ ...current, delivery: waitingDelivery, updated_at: new Date().toISOString() }));
+    appendLog('delivery_waiting_command', { merchant_oid: order.merchant_oid });
+    return waitingDelivery;
+  }
+
+  try {
+    const result = await runMinecraftCommand(command);
+    const nextDelivery = result.ok
+      ? {
+          ...delivery,
+          status: 'delivered',
+          command,
+          attempts,
+          transport: result.transport,
+          last_attempt_at: now.toISOString(),
+          completed_at: new Date().toISOString(),
+          next_attempt_at: null,
+          last_error: null,
+          response: result.response,
+        }
+      : {
+          ...delivery,
+          status: 'retrying',
+          command,
+          attempts,
+          transport: result.transport,
+          last_attempt_at: now.toISOString(),
+          completed_at: null,
+          next_attempt_at: new Date(Date.now() + DELIVERY_RETRY_MS).toISOString(),
+          last_error: typeof result.response === 'string' ? result.response : JSON.stringify(result.response),
+          response: result.response,
+        };
+
+    updateOrder(order.merchant_oid, current => ({ ...current, delivery: nextDelivery, updated_at: new Date().toISOString() }));
+    appendLog(result.ok ? 'delivery_completed' : 'delivery_retry_scheduled', {
+      merchant_oid: order.merchant_oid,
+      command,
+      attempts,
+    });
+    return nextDelivery;
+  } catch (err) {
+    const nextDelivery = {
+      ...delivery,
+      status: 'retrying',
+      command,
+      attempts,
+      last_attempt_at: now.toISOString(),
+      completed_at: null,
+      next_attempt_at: new Date(Date.now() + DELIVERY_RETRY_MS).toISOString(),
+      last_error: err.message,
+      response: null,
+    };
+    updateOrder(order.merchant_oid, current => ({ ...current, delivery: nextDelivery, updated_at: new Date().toISOString() }));
+    appendLog('delivery_retry_scheduled', { merchant_oid: order.merchant_oid, command, attempts, error: err.message });
+    return nextDelivery;
+  } finally {
+    activeDeliveries.delete(order.merchant_oid);
+  }
+}
+
+async function processDeliveryQueue() {
+  const now = Date.now();
+  const orders = readOrders().filter(order => {
+    if (order.status !== 'success' || !order.minecraft_username) return false;
+    if (!order.delivery || order.delivery.status === 'waiting_minecraft') return true;
+    if (order.delivery.status === 'delivered' || order.delivery.status === 'waiting_command') return false;
+    const next = order.delivery.next_attempt_at ? Date.parse(order.delivery.next_attempt_at) : 0;
+    return Number.isNaN(next) || next <= now;
+  });
+
+  for (const order of orders) {
+    await attemptOrderDelivery(order).catch(err => console.error('Delivery queue error:', err));
+  }
+}
+
+app.get('/api/products', (req, res) => {
+  res.json(Object.values(PRODUCTS).map(p => ({ id: p.id, name: p.name, priceTl: p.priceTl })));
+});
+
+app.post('/api/register', (req, res) => {
+  const username = safeMinecraftName(req.body.username);
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ success: false, message: 'Tüm alanları doldurun.' });
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ success: false, message: 'Geçerli e-posta yazın.' });
+  }
+  if (password.length < 4) {
+    return res.status(400).json({ success: false, message: 'Şifre en az 4 karakter olmalı.' });
+  }
+
+  const users = readUsers();
+  if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+    return res.status(400).json({ success: false, message: 'Bu kullanıcı adı zaten alınmış.' });
+  }
+
+  const timestamp = new Date().toISOString();
+  const user = { username, email, timestamp };
+  fs.appendFileSync(USERS_FILE, `${username}|${email}|${password}|${timestamp}\n`);
+  res.json({ success: true, message: 'Kayıt başarılı!', user, userToken: signUserToken(user) });
+});
+
+app.post('/api/login', (req, res) => {
+  const username = String(req.body.username || '').trim();
+  const password = String(req.body.password || '');
+  const admin = findAdmin(username, password);
+
+  if (admin) {
+    return res.json({
+      success: true,
+      message: 'Admin girişi başarılı!',
+      admin: publicAdmin(admin),
+      adminToken: signAdminToken(admin),
+      redirect: '/admin.html',
+    });
+  }
+
+  const user = readUsers().find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Kullanıcı adı veya şifre hatalı.' });
+  }
+
+  res.json({ success: true, message: 'Giriş başarılı!', user: publicUser(user), userToken: signUserToken(user) });
+});
+
+app.get('/api/profile', requireUser, (req, res) => {
+  const orders = readOrders()
+    .filter(order => order.minecraft_username === req.user.username || order.email === req.user.email)
+    .slice()
+    .reverse()
+    .map(order => ({
+      merchant_oid: order.merchant_oid,
+      status: order.status,
+      product: order.product ? { id: order.product.id, name: order.product.name, priceTl: order.product.priceTl } : null,
+      credits: order.credits || order.product?.priceTl || 0,
+      selected_product: order.selected_product || null,
+      created_at: order.created_at,
+    }));
+  const supportTickets = readJson(SUPPORT_TICKETS_FILE)
+    .filter(ticket => ticket.user_username === req.user.username)
+    .slice()
+    .reverse()
+    .map(publicSupportTicket);
+  const applications = readJson(APPLICATIONS_FILE)
+    .filter(application => application.user_username === req.user.username)
+    .slice()
+    .reverse();
+
+  res.json({
+    user: req.user,
+    balance: 0,
+    role: 'Oyuncu',
+    twoFactorEnabled: false,
+    orders,
+    supportTickets,
+    applications,
+  });
+});
+
+app.get('/api/recent-users', (req, res) => {
+  const users = readUsers();
+  res.json({
+    total: users.length,
+    users: users.slice(-5).reverse().map(publicUser),
+  });
+});
+
+function supportMessages(ticket) {
+  if (Array.isArray(ticket.messages) && ticket.messages.length) return ticket.messages;
+  const messages = [];
+  if (ticket.problem) {
+    messages.push({
+      sender_type: 'user',
+      sender_name: ticket.user_username || 'Kullanıcı',
+      text: ticket.problem,
+      created_at: ticket.created_at,
+    });
+  }
+  if (ticket.answer) {
+    messages.push({
+      sender_type: 'admin',
+      sender_name: ticket.answered_by || 'Yetkili',
+      text: ticket.answer,
+      created_at: ticket.answered_at || ticket.created_at,
+    });
+  }
+  return messages;
+}
+
+function publicSupportTicket(ticket) {
+  return {
+    ...ticket,
+    messages: supportMessages(ticket),
+  };
+}
+
+function supportStatusLabel(status) {
+  return ({
+    open: 'Bekliyor',
+    active: 'Canlı sohbet',
+    paused: 'Beklemede',
+    closed: 'Sonlandı',
+    answered: 'Cevaplandı',
+  })[status] || status || '-';
+}
+
+function findUserTicket(tickets, id, user) {
+  return tickets.findIndex(ticket => ticket.id === id && ticket.user_username === user.username);
+}
+
+app.post('/api/support-tickets', requireUser, (req, res) => {
+  const title = String(req.body.title || '').trim();
+  const problem = String(req.body.problem || '').trim();
+
+  if (!title || !problem) {
+    return res.status(400).json({ error: 'Destek başlığı ve sorun zorunlu.' });
+  }
+
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const ticket = {
+    id: 'TK' + Date.now().toString(36).toUpperCase(),
+    user_username: req.user.username,
+    user_email: req.user.email,
+    title,
+    problem,
+    status: 'open',
+    answer: null,
+    answered_by: null,
+    answered_at: null,
+    messages: [{
+      sender_type: 'user',
+      sender_name: req.user.username,
+      text: problem,
+      created_at: new Date().toISOString(),
+    }],
+    started_by: null,
+    started_at: null,
+    paused_by: null,
+    paused_at: null,
+    pause_reason: null,
+    wait_minutes: null,
+    user_rating: null,
+    closed_by: null,
+    closed_at: null,
+    created_at: new Date().toISOString(),
+  };
+  tickets.push(ticket);
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_ticket_created', { id: ticket.id, title });
+  res.json({ success: true, ticket: { id: ticket.id, status: ticket.status } });
+});
+
+app.get('/api/support-tickets/my', requireUser, (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE)
+    .filter(ticket => ticket.user_username === req.user.username)
+    .slice()
+    .reverse();
+  res.json({ tickets: tickets.map(publicSupportTicket) });
+});
+
+app.get('/api/support-tickets/:id', requireUser, (req, res) => {
+  const ticket = readJson(SUPPORT_TICKETS_FILE).find(item => item.id === req.params.id && item.user_username === req.user.username);
+  if (!ticket) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  res.json({ ticket: publicSupportTicket(ticket) });
+});
+
+app.post('/api/support-tickets/:id/messages', requireUser, (req, res) => {
+  const text = String(req.body.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'Mesaj boş olamaz.' });
+
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = findUserTicket(tickets, req.params.id, req.user);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (tickets[index].status !== 'active') {
+    return res.status(400).json({ error: 'Bu sohbet aktif değil. Mesaj göndermek için yetkilinin sohbeti başlatması gerekir.' });
+  }
+
+  tickets[index].messages = supportMessages(tickets[index]);
+  tickets[index].messages.push({
+    sender_type: 'user',
+    sender_name: req.user.username,
+    text,
+    created_at: new Date().toISOString(),
+  });
+  tickets[index].updated_at = new Date().toISOString();
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_user_message', { id: req.params.id });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/support-tickets/:id/pause', requireUser, (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = findUserTicket(tickets, req.params.id, req.user);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (!['open', 'active'].includes(tickets[index].status)) {
+    return res.status(400).json({ error: 'Bu sohbet zaten beklemede veya sonlanmış.' });
+  }
+
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'paused',
+    paused_by: req.user.username,
+    paused_at: new Date().toISOString(),
+    pause_reason: 'Kullanıcı sohbete ara istedi.',
+  };
+  tickets[index].messages.push({
+    sender_type: 'system',
+    sender_name: 'Sistem',
+    text: `${req.user.username} sohbeti beklemeye aldı.`,
+    created_at: tickets[index].paused_at,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_paused_by_user', { id: req.params.id });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/support-tickets/:id/close', requireUser, (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = findUserTicket(tickets, req.params.id, req.user);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (tickets[index].status === 'closed' || tickets[index].status === 'answered') {
+    return res.status(400).json({ error: 'Bu sohbet zaten sonlanmış.' });
+  }
+
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'closed',
+    closed_by: req.user.username,
+    closed_at: new Date().toISOString(),
+  };
+  tickets[index].messages.push({
+    sender_type: 'system',
+    sender_name: 'Sistem',
+    text: `${req.user.username} sohbeti sonlandırdı.`,
+    created_at: tickets[index].closed_at,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_closed_by_user', { id: req.params.id });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/applications', requireUser, (req, res) => {
+  const username = safeMinecraftName(req.body.username);
+  const discord = String(req.body.discord || '').trim();
+  const age = Number(req.body.age);
+  const reason = String(req.body.reason || '').trim();
+
+  if (!username || !discord || !age || !reason) {
+    return res.status(400).json({ error: 'Başvuru alanlarının tamamı zorunlu.' });
+  }
+
+  const applications = readJson(APPLICATIONS_FILE);
+  const application = {
+    id: 'AP' + Date.now().toString(36).toUpperCase(),
+    user_username: req.user.username,
+    user_email: req.user.email,
+    username,
+    discord,
+    age,
+    reason,
+    status: 'open',
+    answer: null,
+    answered_by: null,
+    answered_at: null,
+    verification_code: null,
+    code_saved: false,
+    created_at: new Date().toISOString(),
+  };
+  applications.push(application);
+  writeJson(APPLICATIONS_FILE, applications);
+  appendLog('application_created', { id: application.id, username });
+  res.json({ success: true, application: { id: application.id, status: application.status } });
+});
+
+app.get('/api/applications/my', requireUser, (req, res) => {
+  const applications = readJson(APPLICATIONS_FILE)
+    .filter(application => application.user_username === req.user.username)
+    .slice()
+    .reverse();
+  res.json({ applications });
+});
+
+app.get('/api/admin/me', requireAdmin(), (req, res) => {
+  res.json({ admin: req.admin });
+});
+
+app.get('/api/admin/orders', requireAdmin('orders'), (req, res) => {
+  res.json({
+    orders: readOrders().slice().reverse().map(order => ({
+      merchant_oid: order.merchant_oid,
+      status: order.status,
+      minecraft_username: order.minecraft_username,
+      email: order.email,
+      product: order.product ? { id: order.product.id, name: order.product.name, priceTl: order.product.priceTl } : null,
+      credits: order.credits || order.product?.priceTl || 0,
+      selected_product: order.selected_product || null,
+      expected_amount: order.expected_amount,
+      paytr_total_amount: order.paytr_total_amount,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      delivery: order.delivery,
+    })),
+  });
+});
+
+app.get('/api/admin/punishments', requireAdmin('punishments'), (req, res) => {
+  res.json({ punishments: readJson(PUNISHMENTS_FILE).slice().reverse() });
+});
+
+app.post('/api/admin/punishments', requireAdmin('punishments'), (req, res) => {
+  const type = String(req.body.type || '').trim();
+  const username = safeMinecraftName(req.body.username);
+  const reason = String(req.body.reason || '').trim();
+  const staff = req.admin.displayName;
+
+  if (!['ban', 'mute', 'kick', 'warn'].includes(type)) {
+    return res.status(400).json({ error: 'Geçersiz ceza türü.' });
+  }
+  if (!username || !reason) {
+    return res.status(400).json({ error: 'Oyuncu adı ve sebep zorunlu.' });
+  }
+
+  const punishments = readJson(PUNISHMENTS_FILE);
+  const punishment = {
+    id: 'PN' + Date.now().toString(36).toUpperCase(),
+    type,
+    username,
+    reason,
+    staff,
+    created_at: new Date().toISOString(),
+  };
+  punishments.push(punishment);
+  writeJson(PUNISHMENTS_FILE, punishments);
+  res.json({ success: true, punishment });
+});
+
+app.get('/api/punishments', (req, res) => {
+  const allowed = ['ban', 'mute', 'kick', 'warn'];
+  const type = String(req.query.type || '').trim();
+  const punishments = readJson(PUNISHMENTS_FILE).filter(item => !type || allowed.includes(type) && item.type === type);
+  res.json({ punishments: punishments.slice().reverse() });
+});
+
+app.get('/api/admin/support-replies', requireAdmin('support'), (req, res) => {
+  res.json({ replies: readJson(SUPPORT_REPLIES_FILE).slice().reverse() });
+});
+
+app.get('/api/admin/support-tickets', requireAdmin('support'), (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE)
+    .filter(ticket => ['open', 'active'].includes(ticket.status))
+    .slice()
+    .reverse()
+    .map(publicSupportTicket);
+  res.json({ tickets });
+});
+
+app.get('/api/admin/support-history', requireAdmin('support'), (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE)
+    .filter(ticket => ['paused', 'closed', 'answered'].includes(ticket.status))
+    .slice()
+    .reverse()
+    .map(publicSupportTicket);
+  res.json({ tickets });
+});
+
+app.get('/api/admin/support-tickets/:id', requireAdmin('support'), (req, res) => {
+  const ticket = readJson(SUPPORT_TICKETS_FILE).find(item => item.id === req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  res.json({ ticket: publicSupportTicket(ticket) });
+});
+
+app.post('/api/admin/support-tickets/:id/start', requireAdmin('support'), (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = tickets.findIndex(ticket => ticket.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (tickets[index].status === 'closed' || tickets[index].status === 'answered') {
+    return res.status(400).json({ error: 'Sonlanmış sohbet yeniden başlatılamaz.' });
+  }
+
+  const now = new Date().toISOString();
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'active',
+    started_by: tickets[index].started_by || req.admin.displayName,
+    started_at: tickets[index].started_at || now,
+    paused_by: null,
+    paused_at: null,
+    pause_reason: null,
+    wait_minutes: null,
+  };
+  tickets[index].messages.push({
+    sender_type: 'system',
+    sender_name: 'Sistem',
+    text: `${req.admin.displayName} sohbeti başlattı.`,
+    created_at: now,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_started', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/admin/support-tickets/:id/messages', requireAdmin('support'), (req, res) => {
+  const text = String(req.body.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'Mesaj boş olamaz.' });
+
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = tickets.findIndex(ticket => ticket.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (tickets[index].status !== 'active') {
+    return res.status(400).json({ error: 'Bu sohbet aktif değil. Önce sohbeti başlatın.' });
+  }
+
+  tickets[index].messages = supportMessages(tickets[index]);
+  tickets[index].messages.push({
+    sender_type: 'admin',
+    sender_name: req.admin.displayName,
+    text,
+    created_at: new Date().toISOString(),
+  });
+  tickets[index].updated_at = new Date().toISOString();
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_admin_message', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/admin/support-tickets/:id/pause', requireAdmin('support'), (req, res) => {
+  const waitMinutes = Math.max(0, Math.min(1440, Number(req.body.wait_minutes || 0)));
+  const rating = String(req.body.user_rating || '').trim();
+  const note = String(req.body.pause_reason || '').trim();
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = tickets.findIndex(ticket => ticket.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (!['open', 'active', 'paused'].includes(tickets[index].status)) {
+    return res.status(400).json({ error: 'Bu sohbet beklemeye alınamaz.' });
+  }
+
+  const now = new Date().toISOString();
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'paused',
+    paused_by: req.admin.displayName,
+    paused_at: now,
+    pause_reason: note || 'Yetkili sohbeti beklemeye aldı.',
+    wait_minutes: waitMinutes,
+    user_rating: rating || null,
+  };
+  tickets[index].messages.push({
+    sender_type: 'system',
+    sender_name: 'Sistem',
+    text: `${req.admin.displayName} sohbeti beklemeye aldı. Bekleme süresi: ${waitMinutes} dakika.`,
+    created_at: now,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_paused_by_admin', { id: req.params.id, admin: req.admin.displayName, waitMinutes });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/admin/support-tickets/:id/close', requireAdmin('support'), (req, res) => {
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = tickets.findIndex(ticket => ticket.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Destek sohbeti bulunamadı.' });
+  if (tickets[index].status === 'closed' || tickets[index].status === 'answered') {
+    return res.status(400).json({ error: 'Bu sohbet zaten sonlanmış.' });
+  }
+
+  const now = new Date().toISOString();
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'closed',
+    closed_by: req.admin.displayName,
+    closed_at: now,
+  };
+  tickets[index].messages.push({
+    sender_type: 'system',
+    sender_name: 'Sistem',
+    text: `${req.admin.displayName} sohbeti sonlandırdı.`,
+    created_at: now,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_chat_closed_by_admin', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, ticket: publicSupportTicket(tickets[index]) });
+});
+
+app.post('/api/admin/support-tickets/:id/answer', requireAdmin('support'), (req, res) => {
+  const answer = String(req.body.answer || '').trim();
+  if (!answer) {
+    return res.status(400).json({ error: 'Cevap metni zorunlu.' });
+  }
+
+  const tickets = readJson(SUPPORT_TICKETS_FILE);
+  const index = tickets.findIndex(ticket => ticket.id === req.params.id && ticket.status === 'open');
+  if (index === -1) {
+    return res.status(404).json({ error: 'Açık destek talebi bulunamadı veya zaten cevaplandı.' });
+  }
+
+  tickets[index] = {
+    ...tickets[index],
+    messages: supportMessages(tickets[index]),
+    status: 'closed',
+    answer,
+    answered_by: req.admin.displayName,
+    answered_at: new Date().toISOString(),
+    closed_by: req.admin.displayName,
+    closed_at: new Date().toISOString(),
+  };
+  tickets[index].messages.push({
+    sender_type: 'admin',
+    sender_name: req.admin.displayName,
+    text: answer,
+    created_at: tickets[index].answered_at,
+  });
+  writeJson(SUPPORT_TICKETS_FILE, tickets);
+  appendLog('support_ticket_answered', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, ticket: tickets[index] });
+});
+
+app.get('/api/admin/applications', requireAdmin('applications'), (req, res) => {
+  res.json({ applications: readJson(APPLICATIONS_FILE).filter(application => application.status === 'open').slice().reverse() });
+});
+
+app.post('/api/admin/applications/:id/answer', requireAdmin('applications'), (req, res) => {
+  const answer = String(req.body.answer || '').trim();
+  if (!answer) {
+    return res.status(400).json({ error: 'Cevap metni zorunlu.' });
+  }
+
+  const applications = readJson(APPLICATIONS_FILE);
+  const index = applications.findIndex(application => application.id === req.params.id && application.status === 'open');
+  if (index === -1) {
+    return res.status(404).json({ error: 'Açık başvuru bulunamadı veya zaten cevaplandı.' });
+  }
+
+  applications[index] = {
+    ...applications[index],
+    status: 'answered',
+    answer,
+    answered_by: req.admin.displayName,
+    answered_at: new Date().toISOString(),
+  };
+  writeJson(APPLICATIONS_FILE, applications);
+  appendLog('application_answered', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, application: applications[index] });
+});
+
+function makeApplicationCode() {
+  const existingApplications = readJson(APPLICATIONS_FILE).map(item => item.verification_code).filter(Boolean);
+  const existingCodes = readJson(APPLICATION_CODES_FILE).map(item => item.code).filter(Boolean);
+  const used = new Set([...existingApplications, ...existingCodes]);
+  let code;
+  do {
+    code = crypto.randomBytes(3).toString('hex').toUpperCase();
+  } while (used.has(code));
+  return code;
+}
+
+app.get('/api/admin/applications/pending-codes', requireAdmin('applications'), (req, res) => {
+  const applications = readJson(APPLICATIONS_FILE)
+    .filter(application => application.status === 'accepted_pending_code' && !application.code_saved)
+    .slice()
+    .reverse();
+  res.json({ applications });
+});
+
+app.post('/api/admin/applications/:id/accept', requireAdmin('applications'), (req, res) => {
+  if (!req.body.confirmed) {
+    return res.status(400).json({ error: 'Başvuruyu kabul etmek için doğrulama gerekli.' });
+  }
+
+  const applications = readJson(APPLICATIONS_FILE);
+  const index = applications.findIndex(application => application.id === req.params.id && application.status === 'open');
+  if (index === -1) {
+    return res.status(404).json({ error: 'Açık başvuru bulunamadı veya zaten işlem yapılmış.' });
+  }
+
+  const code = makeApplicationCode();
+  applications[index] = {
+    ...applications[index],
+    status: 'accepted_pending_code',
+    answer: 'Başvurun kabul edildi. Discord sunucumuza katılıp memollbey veya racing_time adlı kişiye şu kodu atınız: ' + code,
+    verification_code: code,
+    code_saved: false,
+    answered_by: req.admin.displayName,
+    answered_at: new Date().toISOString(),
+  };
+  writeJson(APPLICATIONS_FILE, applications);
+  appendLog('application_accepted', { id: req.params.id, admin: req.admin.displayName });
+  res.json({ success: true, application: applications[index] });
+});
+
+app.post('/api/admin/applications/verify-code', requireAdmin('applications'), (req, res) => {
+  const code = String(req.body.code || '').trim().toUpperCase();
+  const application = readJson(APPLICATIONS_FILE).find(item => item.verification_code === code);
+  if (!application) {
+    return res.status(404).json({ valid: false, error: 'Kod bulunamadı.' });
+  }
+  res.json({
+    valid: true,
+    application: {
+      id: application.id,
+      username: application.username,
+      discord: application.discord,
+      status: application.status,
+      code_saved: application.code_saved,
+      code: application.verification_code,
+    },
+  });
+});
+
+app.post('/api/admin/applications/save-code', requireAdmin('applications'), (req, res) => {
+  const code = String(req.body.code || '').trim().toUpperCase();
+  const applications = readJson(APPLICATIONS_FILE);
+  const index = applications.findIndex(item => item.verification_code === code);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Kod bulunamadı.' });
+  }
+  if (applications[index].code_saved) {
+    return res.status(400).json({ error: 'Bu kod daha önce kaydedilmiş.' });
+  }
+
+  const history = readJson(APPLICATION_CODES_FILE);
+  const record = {
+    code,
+    application_id: applications[index].id,
+    username: applications[index].username,
+    discord: applications[index].discord,
+    saved_by: req.admin.displayName,
+    saved_at: new Date().toISOString(),
+  };
+  history.push(record);
+  applications[index] = {
+    ...applications[index],
+    status: 'code_saved',
+    code_saved: true,
+    code_saved_by: req.admin.displayName,
+    code_saved_at: record.saved_at,
+  };
+  writeJson(APPLICATION_CODES_FILE, history);
+  writeJson(APPLICATIONS_FILE, applications);
+  appendLog('application_code_saved', { code, admin: req.admin.displayName });
+  res.json({ success: true, record });
+});
+
+app.get('/api/admin/application-codes', requireAdmin('applications'), (req, res) => {
+  res.json({ codes: readJson(APPLICATION_CODES_FILE).slice().reverse() });
+});
+
+app.get('/api/admin/admins', requireAdmin('admins'), (req, res) => {
+  res.json({ admins: readAdmins().map(publicAdmin) });
+});
+
+app.post('/api/admin/admins', requireAdmin('admins'), (req, res) => {
+  const username = String(req.body.username || '').trim();
+  const password = String(req.body.password || '');
+  const displayName = String(req.body.displayName || '').trim();
+  const role = String(req.body.role || 'staff').trim();
+  const permissions = role === 'full'
+    ? ['orders', 'support', 'applications', 'punishments', 'admins']
+    : ['support', 'punishments'];
+
+  if (!username || !password || !displayName) {
+    return res.status(400).json({ error: 'Admin adı, şifre ve görünen ad zorunlu.' });
+  }
+  if (readAdmins().some(admin => admin.username === username)) {
+    return res.status(400).json({ error: 'Bu admin adı zaten kullanılıyor.' });
+  }
+
+  const admins = readJson(ADMINS_FILE);
+  const admin = { username, password, displayName, role: role === 'full' ? 'full' : 'staff', permissions };
+  admins.push(admin);
+  writeJson(ADMINS_FILE, admins);
+  res.json({ success: true, admin: publicAdmin(admin) });
+});
+
+app.post('/api/paytr/create-payment', async (req, res) => {
+  try {
+    // SHOP_MODE=free ise PayTR'ye gitmeden test siparişi oluşturur.
+    // Kullanıcı payment-success sayfasında Minecraft adını girince teslimat denenir.
+    if (SHOP_MODE !== 'paytr') {
+      const selectedProduct = PRODUCTS[String(req.body.selected_product || req.body.product || '').toLowerCase()] || null;
+      const credits = Math.floor(Number(req.body.credits || selectedProduct?.priceTl || 0));
+      const email = String(req.body.email || '').trim().toLowerCase() || 'test@local.dev';
+      if (!Number.isFinite(credits) || credits < 1 || credits > 100000) {
+        return res.status(400).json({ error: 'Kredi miktarı 1 ile 100000 arasında olmalı.' });
+      }
+
+      const merchant_oid = makeMerchantOid();
+      const product = {
+        id: 'credits',
+        name: `${credits} Kredi`,
+        priceTl: credits,
+        group: null,
+      };
+      const order = {
+        merchant_oid,
+        status: 'success',
+        mode: 'free',
+        minecraft_username: null,
+        email,
+        product,
+        credits,
+        selected_product: selectedProduct ? {
+          id: selectedProduct.id,
+          name: selectedProduct.name,
+          requiredCredits: selectedProduct.priceTl,
+        } : null,
+        expected_amount: String(credits * 100),
+        paytr_total_amount: '0',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        delivery: makeQueuedDelivery({ merchant_oid, status: 'success', minecraft_username: null, product, credits }),
+      };
+      const orders = readOrders();
+      orders.push(order);
+      writeOrders(orders);
+      appendLog('free_order_created', { merchant_oid, credits, selected_product: selectedProduct?.id || null });
+      return res.json({ free: true, merchant_oid, redirect: `/payment-success.html?oid=${encodeURIComponent(merchant_oid)}` });
+    }
+    const selectedProduct = PRODUCTS[String(req.body.selected_product || req.body.product || '').toLowerCase()] || null;
+    const credits = Math.floor(Number(req.body.credits || selectedProduct?.priceTl || 0));
+    const product = {
+      id: 'credits',
+      name: `${credits} Kredi`,
+      priceTl: credits,
+      group: null,
+    };
+    if (!Number.isFinite(credits) || credits < 1 || credits > 100000) {
+      return res.status(400).json({ error: 'Kredi miktarı 1 ile 100000 arasında olmalı.' });
+    }
+    const username = 'CyanideNW';
+    const email = String(req.body.email || '').trim().toLowerCase();
+
+    if (!product) return res.status(400).json({ error: 'Geçersiz ürün.' });
+    if (!username) return res.status(400).json({ error: 'Minecraft kullanıcı adı 3-16 karakter olmalı. Sadece harf, sayı ve _ kullan.' });
+    if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Geçerli e-posta yaz.' });
+
+    const merchant_id = process.env.PAYTR_MERCHANT_ID;
+    if (!merchant_id || !process.env.PAYTR_MERCHANT_KEY || !process.env.PAYTR_MERCHANT_SALT) {
+      return res.status(500).json({ error: 'PayTR bilgileri eksik. .env dosyasını doldur.' });
+    }
+
+    const merchant_oid = makeMerchantOid();
+    const payment_amount = String(product.priceTl * 100);
+    const user_basket = Buffer.from(JSON.stringify([[product.name, product.priceTl.toFixed(2), 1]])).toString('base64');
+    const user_ip = getClientIp(req);
+    const no_installment = '1';
+    const max_installment = '0';
+    const currency = 'TL';
+    const test_mode = String(process.env.PAYTR_TEST_MODE || '1');
+
+    const paytr_token = makePaytrTokenForPayment({
+      merchant_id, user_ip, merchant_oid, email, payment_amount, user_basket,
+      no_installment, max_installment, currency, test_mode,
+    });
+
+    const params = new URLSearchParams({
+      merchant_id,
+      user_ip,
+      merchant_oid,
+      email,
+      payment_amount,
+      paytr_token,
+      user_basket,
+      debug_on: String(process.env.PAYTR_DEBUG_ON || '1'),
+      no_installment,
+      max_installment,
+      user_name: email.split('@')[0] || 'CyanideNW',
+      user_address: 'Minecraft sunucusu dijital ürün',
+      user_phone: '05000000000',
+      merchant_ok_url: `${BASE_URL}/payment-success.html?oid=${encodeURIComponent(merchant_oid)}`,
+      merchant_fail_url: `${BASE_URL}/payment-fail.html?oid=${encodeURIComponent(merchant_oid)}`,
+      timeout_limit: '30',
+      currency,
+      test_mode,
+      lang: 'tr',
+    });
+
+    const paytrResponse = await fetch('https://www.paytr.com/odeme/api/get-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params,
+    });
+
+    const text = await paytrResponse.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { status: 'failed', reason: text }; }
+
+    if (data.status !== 'success') {
+      return res.status(400).json({ error: data.reason || 'PayTR token alınamadı.', raw: data });
+    }
+
+    const orders = readOrders();
+    orders.push({
+      merchant_oid,
+      status: 'pending',
+      minecraft_username: null,
+      email,
+      product,
+      credits,
+      selected_product: selectedProduct ? {
+        id: selectedProduct.id,
+        name: selectedProduct.name,
+        requiredCredits: selectedProduct.priceTl,
+      } : null,
+      expected_amount: payment_amount,
+      paytr_total_amount: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      delivery: null,
+    });
+    writeOrders(orders);
+
+    res.json({ token: data.token, merchant_oid });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Sunucu hatası: ' + err.message });
+  }
+});
+
+app.post('/paytr/callback', async (req, res) => {
+  try {
+    const body = req.body;
+
+    if (!verifyPaytrCallback(body)) {
+      console.warn('PAYTR bad hash', body);
+      return res.status(400).send('PAYTR notification failed: bad hash');
+    }
+
+    const orders = readOrders();
+    const order = orders.find(o => o.merchant_oid === body.merchant_oid);
+    if (!order) {
+      console.warn('PAYTR unknown order', body.merchant_oid);
+      return res.send('OK');
+    }
+
+    if (order.status === 'success' || order.status === 'failed') {
+      return res.send('OK');
+    }
+
+    if (String(body.status) === 'success') {
+      const paidAmount = String(body.total_amount || '');
+      if (paidAmount !== String(order.expected_amount)) {
+        updateOrder(order.merchant_oid, o => ({
+          ...o,
+          status: 'amount_mismatch',
+          paytr_total_amount: paidAmount,
+          updated_at: new Date().toISOString(),
+          callback_raw: body,
+        }));
+        return res.send('OK');
+      }
+
+      updateOrder(order.merchant_oid, o => ({
+        ...o,
+        status: 'success',
+        paytr_total_amount: paidAmount,
+        updated_at: new Date().toISOString(),
+        callback_raw: body,
+        delivery: makeQueuedDelivery(o),
+      }));
+    } else {
+      updateOrder(order.merchant_oid, o => ({
+        ...o,
+        status: 'failed',
+        failed_reason_code: body.failed_reason_code || null,
+        failed_reason_msg: body.failed_reason_msg || null,
+        updated_at: new Date().toISOString(),
+        callback_raw: body,
+      }));
+    }
+
+    res.send('OK');
+  } catch (err) {
+    console.error(err);
+    // PayTR tekrar denesin diye OK dönmüyoruz.
+    res.status(500).send('ERROR');
+  }
+});
+
+app.post('/api/order/:oid/confirm-minecraft', async (req, res) => {
+  const minecraftUsername = safeMinecraftName(req.body.minecraft_username);
+  const confirmed = Boolean(req.body.confirmed);
+
+  if (!confirmed) return res.status(400).json({ error: 'Teslimat için onay gerekli.' });
+  if (!minecraftUsername) {
+    return res.status(400).json({ error: 'Minecraft adı 3-16 karakter olmalı. Sadece harf, sayı ve _ kullan.' });
+  }
+
+  const order = readOrders().find(o => o.merchant_oid === req.params.oid);
+  if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (order.status !== 'success') {
+    return res.status(400).json({ error: 'Ödeme onayı henüz gelmedi. Biraz sonra tekrar deneyin.' });
+  }
+  if (order.delivery?.status === 'delivered') {
+    return res.status(400).json({ error: 'Bu sipariş zaten teslim edilmiş.' });
+  }
+
+  const updated = updateOrder(order.merchant_oid, current => ({
+    ...current,
+    minecraft_username: minecraftUsername,
+    delivery: makeQueuedDelivery({ ...current, minecraft_username: minecraftUsername }),
+    updated_at: new Date().toISOString(),
+  }));
+
+  const delivery = await attemptOrderDelivery(updated);
+  const current = readOrders().find(o => o.merchant_oid === req.params.oid);
+  res.json({ success: true, order: current, delivery });
+});
+
+app.get('/api/order/:oid', (req, res) => {
+  const order = readOrders().find(o => o.merchant_oid === req.params.oid);
+  if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  res.json({
+    merchant_oid: order.merchant_oid,
+    status: order.status,
+    minecraft_username: order.minecraft_username,
+    product: { id: order.product.id, name: order.product.name, priceTl: order.product.priceTl, group: order.product.group },
+    credits: order.credits || order.product.priceTl,
+    selected_product: order.selected_product || null,
+    delivery: order.delivery,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`CyanideNW PayTR server: ${BASE_URL}`);
+  console.log(`PayTR callback URL: ${BASE_URL}/paytr/callback`);
+});
+
+setTimeout(() => processDeliveryQueue().catch(err => console.error('Delivery queue startup error:', err)), 2000);
+setInterval(() => processDeliveryQueue().catch(err => console.error('Delivery queue interval error:', err)), 60 * 1000);

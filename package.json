@@ -1,0 +1,414 @@
+function copyIP() {
+  const ip = document.getElementById('serverIp')?.textContent?.trim() || 'play.cyanidenw.net';
+  navigator.clipboard?.writeText(ip);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }[char]));
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString('tr-TR') : '-';
+}
+
+function supportStatusLabel(status) {
+  const labels = {
+    open: 'Yetkili bekleniyor',
+    active: 'Canlı sohbet',
+    paused: 'Beklemede',
+    closed: 'Sonlandı',
+    answered: 'Cevaplandı',
+  };
+  return labels[status] || status || '-';
+}
+
+function hydrateUser() {
+  const user = getUser?.();
+  const nameEl = document.getElementById('heroUsername');
+  const avatarEl = document.querySelector('#heroUser .avatar');
+  if (!user || !nameEl) return;
+
+  nameEl.textContent = user.username;
+  if (avatarEl) avatarEl.src = `https://mc-heads.net/avatar/${encodeURIComponent(user.username)}/32`;
+}
+
+function requireUserMessage(messageEl) {
+  if (getUser?.() && getUserToken?.()) return true;
+  if (messageEl) {
+    messageEl.textContent = 'Bu işlem için önce giriş yapmalısın.';
+    messageEl.className = 'form-note error';
+  }
+  return false;
+}
+
+let activeUserChatId = null;
+let userChatPoll = null;
+
+function renderChatMessages(container, messages = []) {
+  container.innerHTML = messages.map((message) => `
+    <div class="chat-bubble ${message.sender_type === 'user' ? 'mine' : message.sender_type === 'system' ? 'system' : 'theirs'}">
+      <strong>${escapeHtml(message.sender_name || 'Sistem')}</strong>
+      <p>${escapeHtml(message.text)}</p>
+      <small>${formatDate(message.created_at)}</small>
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function showCreatePanel() {
+  document.getElementById('supportCreatePanel')?.removeAttribute('hidden');
+  document.getElementById('userChatPanel')?.setAttribute('hidden', '');
+  activeUserChatId = null;
+  if (userChatPoll) clearInterval(userChatPoll);
+}
+
+function showUserChat(ticket) {
+  const createPanel = document.getElementById('supportCreatePanel');
+  const chatPanel = document.getElementById('userChatPanel');
+  const input = document.getElementById('userChatInput');
+  const sendButton = document.querySelector('#userChatForm button');
+  if (!chatPanel) return;
+
+  activeUserChatId = ticket.id;
+  createPanel?.setAttribute('hidden', '');
+  chatPanel.removeAttribute('hidden');
+  document.getElementById('userChatTitle').textContent = ticket.title;
+  document.getElementById('userChatStatus').textContent = supportStatusLabel(ticket.status);
+  renderChatMessages(document.getElementById('userChatMessages'), ticket.messages || []);
+
+  const canWrite = ticket.status === 'active';
+  input.disabled = !canWrite;
+  sendButton.disabled = !canWrite;
+  input.placeholder = canWrite ? 'Mesaj yaz...' : 'Yetkili sohbeti başlatınca yazabilirsin.';
+}
+
+async function refreshActiveUserChat() {
+  if (!activeUserChatId || !getUserToken?.()) return;
+  try {
+    const res = await fetch(`/api/support-tickets/${encodeURIComponent(activeUserChatId)}`, { headers: userAuthHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sohbet alınamadı.');
+    showUserChat(data.ticket);
+    if (['paused', 'closed', 'answered'].includes(data.ticket.status)) {
+      showCreatePanel();
+      loadSupportHistory();
+    }
+  } catch {
+    showCreatePanel();
+  }
+}
+
+async function openUserChat(id) {
+  const message = document.getElementById('userChatMessage');
+  try {
+    const res = await fetch(`/api/support-tickets/${encodeURIComponent(id)}`, { headers: userAuthHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sohbet açılamadı.');
+    showUserChat(data.ticket);
+    if (userChatPoll) clearInterval(userChatPoll);
+    if (['open', 'active'].includes(data.ticket.status)) {
+      userChatPoll = setInterval(refreshActiveUserChat, 4000);
+    }
+  } catch (err) {
+    if (message) {
+      message.textContent = err.message;
+      message.className = 'form-note error';
+    }
+  }
+}
+
+async function loadSupportHistory() {
+  const list = document.getElementById('supportHistoryList');
+  if (!list || !getUserToken?.()) {
+    if (list) list.innerHTML = '<div class="info-card"><h3>Giriş gerekli</h3><p>Destek geçmişini görmek için giriş yap.</p></div>';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/support-tickets/my', { headers: userAuthHeaders() });
+    const data = await res.json();
+    const tickets = data.tickets || [];
+    const active = tickets.find((ticket) => ['open', 'active'].includes(ticket.status));
+    if (active && !activeUserChatId) showUserChat(active);
+
+    const history = tickets.filter((ticket) => ['paused', 'closed', 'answered'].includes(ticket.status));
+    list.innerHTML = history.map((ticket) => `
+      <button class="info-card support-history-card" type="button" data-id="${escapeHtml(ticket.id)}">
+        <h3>${escapeHtml(ticket.title)}</h3>
+        <p><strong>Durum:</strong> ${escapeHtml(supportStatusLabel(ticket.status))}</p>
+        ${ticket.pause_reason ? `<p><strong>Not:</strong> ${escapeHtml(ticket.pause_reason)}</p>` : ''}
+        ${ticket.wait_minutes ? `<p><strong>Bekleme:</strong> ${escapeHtml(ticket.wait_minutes)} dakika</p>` : ''}
+        <p>${formatDate(ticket.created_at)}</p>
+      </button>
+    `).join('') || '<div class="info-card"><h3>Geçmiş yok</h3><p>Bekletilen veya sonlanmış sohbetin yok.</p></div>';
+
+    list.querySelectorAll('.support-history-card').forEach((card) => {
+      card.addEventListener('click', () => openUserChat(card.dataset.id));
+    });
+  } catch {
+    list.innerHTML = '<div class="info-card"><h3>Geçmiş alınamadı</h3><p>Tekrar giriş yapmayı dene.</p></div>';
+  }
+}
+
+function setupSupportTicketForm() {
+  const form = document.getElementById('supportTicketForm');
+  const message = document.getElementById('supportTicketMessage');
+  if (!form || !message) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!requireUserMessage(message)) return;
+    message.textContent = 'Gönderiliyor...';
+    message.className = 'form-note';
+
+    try {
+      const res = await fetch('/api/support-tickets', {
+        method: 'POST',
+        headers: userAuthHeaders(),
+        body: JSON.stringify({
+          title: supportTicketTitle.value,
+          problem: supportTicketProblem.value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Destek talebi gönderilemedi.');
+      form.reset();
+      message.textContent = 'Destek talebin admin paneline gönderildi. Yetkili sohbeti başlatınca buradan yazışabilirsin.';
+      message.className = 'form-note success';
+      await loadSupportHistory();
+      openUserChat(data.ticket.id);
+    } catch (err) {
+      message.textContent = err.message;
+      message.className = 'form-note error';
+    }
+  });
+}
+
+function setupUserChatControls() {
+  const form = document.getElementById('userChatForm');
+  if (!form) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = document.getElementById('userChatMessage');
+    const input = document.getElementById('userChatInput');
+    if (!activeUserChatId || !input.value.trim()) return;
+    try {
+      const res = await fetch(`/api/support-tickets/${encodeURIComponent(activeUserChatId)}/messages`, {
+        method: 'POST',
+        headers: userAuthHeaders(),
+        body: JSON.stringify({ text: input.value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Mesaj gönderilemedi.');
+      input.value = '';
+      showUserChat(data.ticket);
+      message.textContent = '';
+    } catch (err) {
+      message.textContent = err.message;
+      message.className = 'form-note error';
+    }
+  });
+
+  document.getElementById('userPauseChat')?.addEventListener('click', async () => {
+    if (!activeUserChatId || !confirm('Sohbete ara istemek istediğine emin misin?')) return;
+    await fetch(`/api/support-tickets/${encodeURIComponent(activeUserChatId)}/pause`, { method: 'POST', headers: userAuthHeaders() });
+    showCreatePanel();
+    loadSupportHistory();
+  });
+
+  document.getElementById('userCloseChat')?.addEventListener('click', async () => {
+    if (!activeUserChatId || !confirm('Sohbeti sonlandırmak istediğine emin misin?')) return;
+    await fetch(`/api/support-tickets/${encodeURIComponent(activeUserChatId)}/close`, { method: 'POST', headers: userAuthHeaders() });
+    showCreatePanel();
+    loadSupportHistory();
+  });
+}
+
+async function loadApplicationHistory() {
+  const list = document.getElementById('applicationHistoryList');
+  if (!list || !getUserToken?.()) {
+    if (list) list.innerHTML = '<div class="info-card"><h3>Giriş gerekli</h3><p>Başvuru geçmişini görmek için giriş yap.</p></div>';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/applications/my', { headers: userAuthHeaders() });
+    const data = await res.json();
+    list.innerHTML = (data.applications || []).map((application) => `
+      <div class="info-card">
+        <h3>${escapeHtml(application.username)} başvurusu</h3>
+        <p><strong>Soru:</strong> ${escapeHtml(application.reason)}</p>
+        <p><strong>Durum:</strong> ${application.status === 'open' ? 'İncelemede' : application.status === 'accepted_pending_code' ? 'Kabul edildi' : application.status === 'code_saved' ? 'Kod kaydedildi' : application.status}</p>
+        ${application.answer ? `<p><strong>Cevap:</strong> ${escapeHtml(application.answer)}</p>` : ''}
+        ${application.answered_by ? `<p><strong>Cevaplayan:</strong> ${escapeHtml(application.answered_by)}</p>` : ''}
+        <p>${formatDate(application.created_at)}</p>
+      </div>
+    `).join('') || '<div class="info-card"><h3>Başvuru yok</h3><p>Henüz başvuru göndermedin.</p></div>';
+  } catch {
+    list.innerHTML = '<div class="info-card"><h3>Geçmiş alınamadı</h3><p>Tekrar giriş yapmayı dene.</p></div>';
+  }
+}
+
+function setupPunishmentTabs() {
+  const tabs = document.querySelectorAll('.punishment-tab');
+  const title = document.getElementById('punishmentTitle');
+  const empty = document.getElementById('punishmentEmpty');
+  const rows = document.getElementById('punishmentRows');
+  if (!tabs.length || !title || !empty || !rows) return;
+
+  const labels = {
+    ban: ['Banlar', 'Ban kaydı bulunamadı.'],
+    mute: ['Susturulmalar', 'Susturulma kaydı bulunamadı.'],
+    kick: ['Atılmalar', 'Atılma kaydı bulunamadı.'],
+    warn: ['Uyarılar', 'Uyarı kaydı bulunamadı.'],
+  };
+
+  async function loadPunishments(type) {
+    const [nextTitle, nextEmpty] = labels[type] || labels.ban;
+    title.textContent = nextTitle;
+    empty.hidden = false;
+    empty.textContent = 'Yükleniyor...';
+    rows.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/punishments?type=' + encodeURIComponent(type));
+      const data = await res.json();
+      rows.innerHTML = (data.punishments || []).map((item) => `
+        <tr>
+          <td>${escapeHtml(item.username)}</td>
+          <td>${escapeHtml(item.reason)}</td>
+          <td>${escapeHtml(item.staff)}</td>
+          <td>${formatDate(item.created_at)}</td>
+        </tr>
+      `).join('');
+      empty.textContent = nextEmpty;
+      empty.hidden = Boolean(data.punishments?.length);
+    } catch {
+      empty.textContent = nextEmpty;
+    }
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((item) => item.classList.toggle('active', item === tab));
+      loadPunishments(tab.dataset.punishment);
+    });
+  });
+
+  loadPunishments(document.querySelector('.punishment-tab.active')?.dataset.punishment || 'ban');
+}
+
+function setupApplicationForm() {
+  const form = document.getElementById('applicationForm');
+  const message = document.getElementById('applicationMessage');
+  if (!form || !message) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!requireUserMessage(message)) return;
+    message.textContent = 'Gönderiliyor...';
+    message.className = 'form-note';
+
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: userAuthHeaders(),
+        body: JSON.stringify({
+          username: appUsername.value,
+          discord: appDiscord.value,
+          age: appAge.value,
+          reason: appReason.value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Başvuru gönderilemedi.');
+      message.textContent = 'Başvurun admin paneline gönderildi.';
+      message.className = 'form-note success';
+      form.reset();
+      loadApplicationHistory();
+    } catch (err) {
+      message.textContent = err.message;
+      message.className = 'form-note error';
+    }
+  });
+}
+
+function emptyProfileRow(title, text) {
+  return `<div class="profile-empty"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(text)}</span></div>`;
+}
+
+function setupProfilePage() {
+  const shell = document.querySelector('.profile-shell');
+  if (!shell) return;
+
+  if (!getUser?.() || !getUserToken?.()) {
+    location.href = '/login.html';
+    return;
+  }
+
+  fetch('/api/profile', { headers: userAuthHeaders() })
+    .then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Profil alınamadı.');
+      return data;
+    })
+    .then((data) => {
+      const user = data.user || getUser();
+      document.getElementById('profileAvatar').src = avatarUrl(user.username, 64);
+      document.getElementById('profileName').textContent = user.username;
+      document.getElementById('profileRole').textContent = data.role || 'Oyuncu';
+      document.getElementById('profileBalance').textContent = `${Number(data.balance || 0).toFixed(2)} TL`;
+      document.getElementById('profileRoleDetail').textContent = data.role || 'Oyuncu';
+      document.getElementById('profileEmail').textContent = user.email || '-';
+      document.getElementById('profileCreated').textContent = formatDate(user.timestamp);
+      document.getElementById('profileTwoFactor').textContent = data.twoFactorEnabled ? 'Aktif' : 'Devre dışı';
+
+      const support = data.supportTickets || [];
+      document.getElementById('profileSupportList').innerHTML = support.map((ticket) => `
+        <a class="profile-row" href="/destek.html">
+          <strong>${escapeHtml(ticket.title)}</strong>
+          <span>${escapeHtml(supportStatusLabel(ticket.status))}</span>
+          <small>${formatDate(ticket.created_at)}</small>
+        </a>
+      `).join('') || emptyProfileRow('Veri bulunamadı', 'Henüz destek talebin yok.');
+
+      const applications = data.applications || [];
+      document.getElementById('profileApplicationList').innerHTML = applications.map((application) => `
+        <a class="profile-row" href="/basvuru.html">
+          <strong>${escapeHtml(application.username)} başvurusu</strong>
+          <span>${escapeHtml(application.status || 'İncelemede')}</span>
+          <small>${formatDate(application.created_at)}</small>
+        </a>
+      `).join('') || emptyProfileRow('Veri bulunamadı', 'Henüz başvurun yok.');
+
+      const orders = data.orders || [];
+      document.getElementById('profileOrderList').innerHTML = orders.map((order) => `
+        <a class="profile-row" href="/payment.html">
+          <strong>${escapeHtml(order.product?.name || 'Ürün')}</strong>
+          <span>${escapeHtml(order.status || '-')}</span>
+          <small>${formatDate(order.created_at)}</small>
+        </a>
+      `).join('') || emptyProfileRow('Veri bulunamadı', 'Henüz siparişin yok.');
+    })
+    .catch(() => {
+      shell.innerHTML = '<div class="profile-panel profile-empty"><strong>Profil alınamadı</strong><span>Tekrar giriş yapmayı dene.</span></div>';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  hydrateUser();
+  setupSupportTicketForm();
+  setupUserChatControls();
+  setupPunishmentTabs();
+  setupApplicationForm();
+  setupProfilePage();
+  loadSupportHistory();
+  loadApplicationHistory();
+});

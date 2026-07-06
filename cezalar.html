@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Başvuru</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/">Ana sayfa</a>
+    <a href="/payment.html">Market</a>
+    <a href="/basvuru.html" class="active">Başvuru</a>
+    <a href="/destek.html">Destek</a>
+    <a href="/cezalar.html" class="nav-btn">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <section class="hero compact-hero">
+    <div class="hero-content">
+      <span class="hero-badge">Yetkili başvuruları</span>
+      <div class="hero-logo">CN</div>
+    </div>
+  </section>
+
+  <main class="main-content">
+    <div class="container">
+      <div class="breadcrumb">Ana sayfa › <span>Başvuru</span></div>
+
+      <div class="application-layout">
+        <section class="data-table-wrap application-card">
+          <div class="data-table-header">
+            <h2>Yetkili Başvurusu</h2>
+            <span class="status-pill">Açık</span>
+          </div>
+          <form class="application-form" id="applicationForm">
+            <label class="app-field">
+              <span>Minecraft kullanıcı adı</span>
+              <input id="appUsername" maxlength="16" placeholder="Örn: RacingTime" required>
+            </label>
+            <label class="app-field">
+              <span>Discord kullanıcı adın</span>
+              <input id="appDiscord" placeholder="Örn: racingtime" required>
+            </label>
+            <label class="app-field">
+              <span>Yaş</span>
+              <input id="appAge" type="number" min="10" max="60" placeholder="Örn: 16" required>
+            </label>
+            <label class="app-field app-field-wide">
+              <span>Neden ekibe katılmak istiyorsun?</span>
+              <textarea id="appReason" rows="5" placeholder="Kısaca deneyimini, aktiflik saatlerini ve neden seni seçmemiz gerektiğini yaz." required></textarea>
+            </label>
+            <button class="btn-primary" type="submit">Başvuruyu gönder</button>
+            <p class="form-note" id="applicationMessage" role="status"></p>
+          </form>
+        </section>
+
+        <aside class="info-stack">
+          <div class="info-card">
+            <h3>Başvuru Geçmişim</h3>
+            <p>Başvurun kabul edilirse burada Discord doğrulama kodun görünür.</p>
+          </div>
+          <div id="applicationHistoryList" class="info-stack"></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

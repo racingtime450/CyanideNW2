@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Admin Paneli</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+  <nav class="top-nav admin-nav">
+    <a href="/admin.html" class="active">Admin Paneli</a>
+    <button class="admin-nav-button" data-section="orders">Satın Alımlar</button>
+    <button class="admin-nav-button" data-section="support">Destek Cevap</button>
+    <button class="admin-nav-button" data-section="applications">Başvuru Cevap</button>
+    <button class="admin-nav-button" data-section="punishments">Ceza Giriş</button>
+    <button class="admin-nav-button" data-section="admins">Admin Hesabı Ekle</button>
+    <button class="admin-nav-button logout-button" id="adminLogout">Çıkış Yap</button>
+  </nav>
+
+  <main class="main-content">
+    <div class="container">
+      <div class="breadcrumb">Admin › <span id="adminWelcome">Panel</span></div>
+
+      <section class="admin-section" id="ordersSection">
+        <div class="data-table-wrap">
+          <div class="data-table-header">
+            <h2>Market Satın Alımları</h2>
+            <button class="btn-secondary small-button" id="refreshOrders">Yenile</button>
+          </div>
+          <div class="admin-table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Sipariş</th><th>Oyuncu</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr>
+              </thead>
+              <tbody id="ordersRows"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="ordersEmpty">Satın alım bulunamadı.</div>
+        </div>
+      </section>
+
+      <section class="admin-section" id="supportSection">
+        <div class="support-chat-layout admin-support-layout">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Açık / Aktif Destekler</h2>
+              <button class="btn-secondary small-button" id="refreshSupport">Yenile</button>
+            </div>
+            <div class="ticket-list" id="supportTicketList"></div>
+            <div class="empty-state" id="supportTicketEmpty">Açık destek talebi yok.</div>
+          </div>
+
+          <div class="data-table-wrap chat-panel" id="adminChatPanel">
+            <div class="chat-header">
+              <div>
+                <p class="eyebrow-text">Yetkili sohbeti</p>
+                <h2 id="adminChatTitle">Sohbet seçilmedi</h2>
+                <span class="status-pill" id="adminChatStatus">Seçilmedi</span>
+              </div>
+              <div class="chat-actions">
+                <button class="btn-secondary small-button" id="adminStartChat" type="button">Sohbeti başlat</button>
+                <button class="btn-secondary small-button" id="adminPauseChat" type="button">Beklemeye al</button>
+                <button class="btn-secondary small-button danger-button" id="adminCloseChat" type="button">Sohbeti sonlandır</button>
+              </div>
+            </div>
+            <div class="chat-messages" id="adminChatMessages"></div>
+            <form class="chat-composer" id="adminChatForm">
+              <input id="adminChatInput" placeholder="Kullanıcıya mesaj yaz..." autocomplete="off">
+              <button class="btn-primary small-button" type="submit">Gönder</button>
+            </form>
+            <p class="form-note" id="supportReplyMessage" role="status"></p>
+
+            <form class="application-form pause-panel" id="adminPausePanel" hidden>
+              <label class="app-field">
+                <span>Kullanıcı değerlendirmesi</span>
+                <select id="supportUserRating">
+                  <option value="normal">Normal</option>
+                  <option value="iyi">İyi</option>
+                  <option value="sabirsiz">Sabırsız</option>
+                  <option value="problemli">Problemli</option>
+                </select>
+              </label>
+              <label class="app-field">
+                <span>Bekleme süresi (dakika)</span>
+                <input id="supportWaitMinutes" type="number" min="0" max="1440" step="5" value="30">
+              </label>
+              <label class="app-field app-field-wide">
+                <span>Bekleme notu</span>
+                <textarea id="supportPauseReason" rows="3" placeholder="Örn: Kontrol için 30 dakika bekletildi."></textarea>
+              </label>
+              <button class="btn-primary" type="submit">Beklemeye kaydet</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="data-table-wrap admin-history-block">
+          <div class="data-table-header">
+            <h2>Bekletilen veya Sonlanmış Sohbetler</h2>
+            <button class="btn-secondary small-button" id="refreshSupportHistory">Yenile</button>
+          </div>
+          <div class="ticket-list history-list" id="supportHistoryList"></div>
+          <div class="empty-state" id="supportHistoryEmpty">Bekletilen veya sonlanmış sohbet bulunamadı.</div>
+        </div>
+      </section>
+
+      <section class="admin-section" id="applicationsSection">
+        <div class="application-layout">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Açık Başvurular</h2>
+              <button class="btn-secondary small-button" id="refreshApplications">Yenile</button>
+            </div>
+            <div class="ticket-list" id="applicationList"></div>
+            <div class="empty-state" id="applicationEmpty">Açık başvuru yok.</div>
+          </div>
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Kod Doğrulama</h2>
+              <span class="status-pill">Başvuru</span>
+            </div>
+            <form class="application-form" id="applicationCodeForm">
+              <label class="app-field app-field-wide">
+                <span>Doğrulama kodu</span>
+                <input id="applicationCodeInput" placeholder="Örn: A1B2C3" maxlength="12" required>
+              </label>
+              <button class="btn-primary" type="submit">Kodu doğrula</button>
+              <button class="btn-secondary" type="button" id="saveApplicationCode" disabled>Kodu kaydet</button>
+              <p class="form-note" id="applicationCodeMessage" role="status"></p>
+            </form>
+            <div class="ticket-list compact-list" id="applicationCodeResult"></div>
+          </div>
+        </div>
+
+        <div class="application-layout admin-history-block">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Kod Bekleyen Başvurular</h2>
+              <button class="btn-secondary small-button" id="refreshPendingCodes">Yenile</button>
+            </div>
+            <div class="ticket-list history-list" id="pendingCodeList"></div>
+            <div class="empty-state" id="pendingCodeEmpty">Kod bekleyen başvuru yok.</div>
+          </div>
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Geçmiş Kodlar</h2>
+              <button class="btn-secondary small-button" id="refreshApplicationCodes">Yenile</button>
+            </div>
+            <div class="ticket-list history-list" id="applicationCodeHistory"></div>
+            <div class="empty-state" id="applicationCodeHistoryEmpty">Kaydedilen kod yok.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-section" id="punishmentsSection">
+        <div class="application-layout">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Ceza Kaydı Gir</h2>
+              <span class="status-pill">Kayıt</span>
+            </div>
+            <form class="application-form" id="punishmentForm">
+              <label class="app-field">
+                <span>Ceza türü</span>
+                <select id="punishmentType" required>
+                  <option value="ban">Ban</option>
+                  <option value="mute">Susturma</option>
+                  <option value="kick">Atılma</option>
+                  <option value="warn">Uyarı</option>
+                </select>
+              </label>
+              <label class="app-field">
+                <span>Oyuncu adı</span>
+                <input id="punishmentUsername" maxlength="16" placeholder="OyuncuAdı" required>
+              </label>
+              <label class="app-field app-field-wide">
+                <span>Sebep</span>
+                <textarea id="punishmentReason" rows="5" placeholder="Ceza sebebini yazın..." required></textarea>
+              </label>
+              <button class="btn-primary" type="submit">Ceza kaydını ekle</button>
+              <p class="form-note" id="punishmentMessage" role="status"></p>
+            </form>
+          </div>
+          <aside class="info-stack" id="punishmentList"></aside>
+        </div>
+      </section>
+
+      <section class="admin-section" id="adminsSection">
+        <div class="application-layout">
+          <div class="data-table-wrap">
+            <div class="data-table-header">
+              <h2>Admin Hesabı Ekle</h2>
+              <span class="status-pill">Tam admin</span>
+            </div>
+            <form class="application-form" id="adminAddForm">
+              <label class="app-field"><span>Giriş adı</span><input id="newAdminUsername" placeholder="admin_giris_adi" required></label>
+              <label class="app-field"><span>Görünen ad</span><input id="newAdminDisplayName" placeholder="Panelde görünecek ad" required></label>
+              <label class="app-field"><span>Şifre</span><input id="newAdminPassword" type="password" placeholder="Güçlü şifre" required></label>
+              <label class="app-field"><span>Yetki</span><select id="newAdminRole"><option value="full">Tam admin</option><option value="staff">Destek + ceza</option></select></label>
+              <button class="btn-primary" type="submit">Admin ekle</button>
+              <p class="form-note" id="adminAddMessage" role="status"></p>
+            </form>
+          </div>
+          <aside class="info-stack" id="adminList"></aside>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Destek</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/">Ana sayfa</a>
+    <a href="/payment.html">Market</a>
+    <a href="/basvuru.html">Başvuru</a>
+    <a href="/destek.html" class="active">Destek</a>
+    <a href="/cezalar.html" class="nav-btn">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <section class="hero compact-hero">
+    <div class="hero-content">
+      <span class="hero-badge">Destek merkezi</span>
+      <div class="hero-logo">CN</div>
+    </div>
+  </section>
+
+  <main class="main-content">
+    <div class="container">
+      <div class="breadcrumb">Ana sayfa › Destek › <span>Canlı Sohbet</span></div>
+
+      <div class="support-chat-layout">
+        <section class="data-table-wrap" id="supportCreatePanel">
+          <div class="data-table-header">
+            <h2>Destek Talebi Aç</h2>
+            <span class="status-pill">Giriş gerekli</span>
+          </div>
+          <form class="application-form support-form" id="supportTicketForm">
+            <label class="app-field app-field-wide">
+              <span>Destek başlığı</span>
+              <input id="supportTicketTitle" placeholder="Örn: Ödeme yaptım ama VIP gelmedi" required>
+            </label>
+            <label class="app-field app-field-wide">
+              <span>İlk mesajın</span>
+              <textarea id="supportTicketProblem" rows="6" placeholder="Sorununu olabildiğince açık yaz. Yetkili sohbeti başlatınca karşılıklı yazışabilirsiniz." required></textarea>
+            </label>
+            <button class="btn-primary" type="submit">Destek talebini gönder</button>
+            <p class="form-note" id="supportTicketMessage" role="status"></p>
+          </form>
+        </section>
+
+        <section class="data-table-wrap chat-panel" id="userChatPanel" hidden>
+          <div class="chat-header">
+            <div>
+              <p class="eyebrow-text">Canlı destek</p>
+              <h2 id="userChatTitle">Sohbet</h2>
+              <span class="status-pill" id="userChatStatus">Bekliyor</span>
+            </div>
+            <div class="chat-actions">
+              <button class="btn-secondary small-button" id="userPauseChat" type="button">Sohbete ara iste</button>
+              <button class="btn-secondary small-button danger-button" id="userCloseChat" type="button">Sohbeti sonlandır</button>
+            </div>
+          </div>
+          <div class="chat-messages" id="userChatMessages"></div>
+          <form class="chat-composer" id="userChatForm">
+            <input id="userChatInput" placeholder="Mesaj yaz..." autocomplete="off">
+            <button class="btn-primary small-button" type="submit">Gönder</button>
+          </form>
+          <p class="form-note" id="userChatMessage" role="status"></p>
+        </section>
+
+        <aside class="info-stack">
+          <div class="info-card">
+            <h3>Bekletilen veya Sonlanmış Sohbetler</h3>
+            <p>Beklemeye alınan ve sonlandırılan sohbetlere tıklayarak tüm konuşma geçmişini görebilirsin.</p>
+          </div>
+          <div id="supportHistoryList" class="info-stack"></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

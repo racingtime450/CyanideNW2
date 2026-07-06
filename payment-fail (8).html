@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CnayineNW - Giriş Yap</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="register-page">
+  <div class="register-container">
+    <div class="register-left"><h2>CnayineNW</h2><p>Hesabına giriş yap.</p></div>
+    <div class="register-right">
+      <a href="/" class="register-back">← Geri</a>
+      <h2>Giriş Yap</h2><p class="subtitle">Kullanıcı adı ve şifreni gir.</p>
+      <div id="msg" class="form-message"></div>
+      <form id="loginForm">
+        <div class="form-group"><span class="input-icon">👤</span><input id="username" placeholder="Kullanıcı adı" required></div>
+        <div class="form-group"><span class="input-icon">🔒</span><input id="password" type="password" placeholder="Şifre" required></div>
+        <div class="form-buttons"><button class="btn-primary" type="submit">Giriş Yap</button><a class="btn-secondary" href="/register.html">Kayıt Ol</a></div>
+      </form>
+      <div class="register-powered">Powered by CnayineNW</div>
+    </div>
+  </div>
+  <script src="/js/auth.js"></script><script src="/js/main.js"></script>
+  <script>
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); const msg=document.getElementById('msg'); msg.className='form-message';
+    const body={username:username.value.trim(), password:password.value};
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json(); msg.textContent=d.message; msg.className='form-message '+(d.success?'success':'error');
+    if(d.success){ setUser(d.user); setTimeout(()=>location.href='/',700); }
+  });
+  </script>
+</body></html>

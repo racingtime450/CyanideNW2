@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ödeme Başarılı - CyanideNW</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="page-shell compact">
+    <section class="result-card success page-enter" aria-labelledby="success-title">
+      <div class="result-icon" aria-hidden="true">✓</div>
+      <p class="eyebrow">PayTR yönlendirmesi tamamlandı</p>
+      <h1 id="success-title">Ödeme başarılı görünüyor</h1>
+      <p class="lede">PayTR bildirimi onaylanınca Minecraft adını girip kredi teslimatını başlatabilirsin.</p>
+
+      <div id="status" class="status-message muted visible" role="status">Sipariş durumu kontrol ediliyor...</div>
+
+      <form class="delivery-form" id="deliveryForm" hidden>
+        <label class="field">
+          <span>Minecraft kullanıcı adı</span>
+          <input id="minecraftUsername" maxlength="16" placeholder="Örn: RacingTime" autocomplete="username" required>
+        </label>
+        <button class="pay-button" type="submit">Eminim, teslimatı başlat</button>
+      </form>
+
+      <div class="delivery-summary" id="deliverySummary" hidden></div>
+      <a class="primary-link" href="/">Ana sayfa</a>
+    </section>
+  </main>
+
+  <script>
+    const oid = new URLSearchParams(location.search).get('oid');
+    const statusEl = document.getElementById('status');
+    const form = document.getElementById('deliveryForm');
+    const summary = document.getElementById('deliverySummary');
+    let currentOrder = null;
+    let pollTimer = null;
+
+    function formatDate(value) {
+      return value ? new Date(value).toLocaleString('tr-TR') : '-';
+    }
+
+    function deliveryText(delivery) {
+      if (!delivery) return 'Teslimat bilgisi bekleniyor.';
+      if (delivery.status === 'waiting_minecraft') return 'Minecraft adını girmen bekleniyor.';
+      if (delivery.status === 'waiting_command') return 'Minecraft teslimat komutu henüz site koduna yazılmadı. Kredi kaydı hazır bekliyor.';
+      if (delivery.status === 'queued') return 'Teslimat kuyruğa alındı.';
+      if (delivery.status === 'retrying') return `Teslimat tekrar denenecek. Sonraki deneme: ${formatDate(delivery.next_attempt_at)}`;
+      if (delivery.status === 'delivered') return 'Teslimat başarıyla tamamlandı.';
+      return delivery.status || 'Teslimat durumu bekleniyor.';
+    }
+
+    function renderOrder(order) {
+      currentOrder = order;
+      const productName = `${order.credits || order.product?.priceTl || 0} Kredi`;
+
+      if (order.status === 'pending') {
+        statusEl.className = 'status-message muted visible loading';
+        statusEl.textContent = 'Ödeme bildirimi bekleniyor. Bu ekran otomatik kontrol ediyor...';
+        form.hidden = true;
+        return;
+      }
+
+      if (order.status !== 'success') {
+        statusEl.className = 'status-message err';
+        statusEl.textContent = 'Sipariş durumu: ' + order.status;
+        form.hidden = true;
+        return;
+      }
+
+      statusEl.className = order.delivery?.status === 'delivered' ? 'status-message ok' : 'status-message muted visible';
+      statusEl.textContent = `${productName} satın alımı onaylandı. ${deliveryText(order.delivery)}`;
+      form.hidden = Boolean(order.minecraft_username || order.delivery?.status === 'delivered');
+      summary.hidden = false;
+      summary.innerHTML = `
+        <strong>Sipariş:</strong> ${order.merchant_oid}<br>
+        <strong>Kredi:</strong> ${productName}<br>
+        <strong>Seçilen market öğesi:</strong> ${order.selected_product?.name || 'Özel kredi miktarı'}<br>
+        <strong>Minecraft adı:</strong> ${order.minecraft_username || 'Bekleniyor'}<br>
+        <strong>Komut:</strong> ${order.delivery?.command || 'Ad girilince hazırlanacak'}<br>
+        <strong>Deneme:</strong> ${order.delivery?.attempts || 0}
+      `;
+    }
+
+    async function loadOrder() {
+      if (!oid) {
+        statusEl.className = 'status-message err';
+        statusEl.textContent = 'Sipariş numarası bulunamadı.';
+        return;
+      }
+      try {
+        const res = await fetch('/api/order/' + encodeURIComponent(oid));
+        const order = await res.json();
+        if (!res.ok) throw new Error(order.error || 'Sipariş alınamadı.');
+        renderOrder(order);
+        if (order.status === 'success' && order.delivery?.status === 'delivered' && pollTimer) {
+          clearInterval(pollTimer);
+        }
+      } catch (err) {
+        statusEl.className = 'status-message err';
+        statusEl.textContent = err.message;
+      }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const minecraft_username = minecraftUsername.value.trim();
+      if (!currentOrder || !confirm(`${minecraft_username} adlı oyuncuya ${currentOrder.credits || currentOrder.product?.priceTl || 0} kredi tanımlanacak. Emin misin?`)) return;
+
+      statusEl.className = 'status-message muted visible loading';
+      statusEl.textContent = 'Teslimat komutu gönderiliyor...';
+      form.hidden = true;
+
+      try {
+        const res = await fetch('/api/order/' + encodeURIComponent(oid) + '/confirm-minecraft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ minecraft_username, confirmed: true })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Teslimat başlatılamadı.');
+        renderOrder(data.order);
+      } catch (err) {
+        statusEl.className = 'status-message err';
+        statusEl.textContent = err.message;
+        form.hidden = false;
+      }
+    });
+
+    loadOrder();
+    pollTimer = setInterval(loadOrder, 15000);
+  </script>
+</body>
+</html>

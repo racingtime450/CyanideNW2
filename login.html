@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Anasayfa</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/" class="active">Ana sayfa</a>
+    <a href="/payment.html">Market</a>
+    <a href="/basvuru.html">Başvuru</a>
+    <a href="/destek.html">Destek</a>
+    <a href="/cezalar.html" class="nav-btn">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-content">
+      <span class="hero-badge" id="playerCount">0 oyuncu aktif</span>
+      <div class="hero-logo">CN</div>
+      <div class="hero-user" id="heroUser">
+        <img class="avatar" src="https://mc-heads.net/avatar/Steve/32" alt="">
+        <span id="heroUsername">Misafir</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="wave-divider">
+    <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+      <path d="M0,20 C360,40 720,0 1080,20 C1260,30 1380,35 1440,20 L1440,40 L0,40 Z" fill="white"/>
+    </svg>
+    <div class="wave-bar">
+      <div class="wave-bar-item">
+        <div>
+          <div class="label">CyanideNW</div>
+          <div class="value" id="serverIp">play.cyanidenw.net</div>
+        </div>
+        <button class="wave-bar-btn" onclick="copyIP()">Sunucu adresini kopyala</button>
+      </div>
+      <div class="wave-bar-item">
+        <div>
+          <div class="label">Discord</div>
+          <div class="value">Oyuna katıl</div>
+        </div>
+        <button class="wave-bar-btn">Discord</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main-content">
+    <div class="container">
+      <div class="welcome-section">
+        <h1>CyanideNW'e Hoş Geldiniz!</h1>
+        <p>Türkiye'nin en iyi Minecraft deneyimini yaşamak için hemen kayıt olun.</p>
+        <div class="welcome-buttons">
+          <a href="/register.html" class="btn-primary">Kayıt Ol</a>
+          <a href="/payment.html" class="btn-secondary">Market</a>
+        </div>
+      </div>
+
+      <div class="cards-grid">
+        <a href="/payment.html?package=vip" class="card-item">
+          <div class="icon">VIP</div>
+          <h3>VIP Paket</h3>
+        </a>
+        <a href="/payment.html?package=vipplus" class="card-item">
+          <div class="icon">VIP+</div>
+          <h3>VIP+ Paket</h3>
+        </a>
+        <a href="/destek.html" class="card-item">
+          <div class="icon">?</div>
+          <h3>Destek</h3>
+        </a>
+        <a href="/cezalar.html" class="card-item">
+          <div class="icon">!</div>
+          <h3>Cezalar</h3>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <h4>Hakkımızda</h4>
+        <p>CyanideNW, oyuncularına kaliteli ve güvenli bir Minecraft deneyimi sunmak için geliştirilen bir sunucudur.</p>
+      </div>
+      <div>
+        <h4>Bağlantılar</h4>
+        <ul>
+          <li><a href="#">KVKK Metni</a></li>
+          <li><a href="#">Hizmet Şartları</a></li>
+          <li><a href="#">Gizlilik Politikası</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Sosyal Medya</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">TikTok</a></li>
+          <li><a href="#">Discord</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Başvuru</h4>
+        <ul>
+          <li><a href="/basvuru.html">Yetkili Başvuru Formu</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>Türkçe</span>
+      <span>Powered by CyanideNW</span>
+    </div>
+  </footer>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

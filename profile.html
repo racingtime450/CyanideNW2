@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CyanideNW Market - Kredi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <nav class="market-nav">
+    <a href="/">Ana sayfa</a>
+    <a href="/payment.html" class="active">Market</a>
+    <a href="/basvuru.html">Başvuru</a>
+    <a href="/destek.html">Destek</a>
+    <a href="/cezalar.html" class="nav-btn">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <main class="page-shell">
+    <section class="checkout-panel page-enter" aria-labelledby="checkout-title">
+      <a class="back-link" href="/">Ana sayfa</a>
+
+      <div class="hero-strip">
+        <div>
+          <p class="eyebrow">1 kredi = 1 TL</p>
+          <h1 id="checkout-title">CyanideNW Kredi Marketi</h1>
+          <p class="lede">İstediğin kredi miktarını seç, ödemeyi tamamla, ardından Minecraft adını onaylayarak teslimatı başlat.</p>
+        </div>
+        <div class="trust-badge">
+          <span id="basketCredits">75</span>
+          <small>seçili kredi</small>
+        </div>
+      </div>
+
+      <section class="market-section" aria-labelledby="membership-title">
+        <div class="market-section-heading">
+          <p class="eyebrow dark">Üyelikler</p>
+          <h2 id="membership-title">Gerekli kredi miktarını seç</h2>
+        </div>
+        <div class="package-grid membership-grid" role="list">
+          <button class="package-card active" type="button" data-product="vip" data-credits="75" role="listitem">
+            <span class="package-topline">Başlangıç üyelik</span>
+            <span class="package-name">VIP</span>
+            <span class="package-copy">VIP almak için sepetine otomatik 75 kredi ekler.</span>
+            <span class="price">75 Kredi</span>
+          </button>
+          <button class="package-card" type="button" data-product="vipplus" data-credits="150" role="listitem">
+            <span class="package-topline">Gelişmiş üyelik</span>
+            <span class="package-name">VIP+</span>
+            <span class="package-copy">VIP+ için gereken kredi miktarını sepetine seçer.</span>
+            <span class="price">150 Kredi</span>
+          </button>
+          <button class="package-card" type="button" data-product="mvip" data-credits="200" role="listitem">
+            <span class="package-topline">Mega üyelik</span>
+            <span class="package-name">MVIP</span>
+            <span class="package-copy">MVIP için gereken kredi miktarını otomatik ayarlar.</span>
+            <span class="price">200 Kredi</span>
+          </button>
+          <button class="package-card" type="button" data-product="mvipplus" data-credits="250" role="listitem">
+            <span class="package-topline">En üst üyelik</span>
+            <span class="package-name">MVIP+</span>
+            <span class="package-copy">MVIP+ için sepetine 250 kredi seçer.</span>
+            <span class="price">250 Kredi</span>
+          </button>
+          <button class="package-card sponsor-card" type="button" data-product="sponsor" data-credits="500" role="listitem">
+            <span class="package-topline">Özel destek</span>
+            <span class="package-name">Sponsor</span>
+            <span class="package-copy">Sponsor için gereken kredi miktarını seçer.</span>
+            <span class="price">500 Kredi</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="market-section crate-section" aria-labelledby="crate-title">
+        <div class="market-section-heading">
+          <p class="eyebrow dark">Eşyalar / Kasalar</p>
+          <h2 id="crate-title">Kasalar</h2>
+        </div>
+        <div class="package-grid crate-grid" role="list">
+          <button class="package-card crate-card" type="button" data-product="cyanidecase" data-credits="150" role="listitem">
+            <span class="package-topline">Özel kasa</span>
+            <span class="package-name">Cyanide Kasası</span>
+            <span class="package-copy">Cyanide Kasası için gereken kredi.</span>
+            <span class="price">150 Kredi</span>
+          </button>
+          <button class="package-card crate-card" type="button" data-product="vipcase" data-credits="100" role="listitem">
+            <span class="package-topline">VIP kasa</span>
+            <span class="package-name">VIP Kasası</span>
+            <span class="package-copy">VIP Kasası için gereken kredi.</span>
+            <span class="price">100 Kredi</span>
+          </button>
+          <button class="package-card crate-card" type="button" data-product="kitcase" data-credits="75" role="listitem">
+            <span class="package-topline">Kit kasası</span>
+            <span class="package-name">Kit Kasası</span>
+            <span class="package-copy">Kit Kasası için gereken kredi.</span>
+            <span class="price">75 Kredi</span>
+          </button>
+          <button class="package-card crate-card" type="button" data-product="pickaxecase" data-credits="50" role="listitem">
+            <span class="package-topline">Kazma kasası</span>
+            <span class="package-name">Kazma Kasası</span>
+            <span class="package-copy">Kazma Kasası için gereken kredi.</span>
+            <span class="price">50 Kredi</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="credit-checkout" id="odeme">
+        <label class="field">
+          <span>Kredi miktarı</span>
+          <input id="credits" type="number" min="1" max="100000" step="1" value="75">
+        </label>
+        <label class="field">
+          <span>E-posta</span>
+          <input id="email" type="email" placeholder="ornek@mail.com" autocomplete="email">
+        </label>
+        <div class="credit-total">
+          <span>Ödenecek tutar</span>
+          <strong id="totalTl">75 TL</strong>
+        </div>
+      </div>
+
+      <button class="pay-button" id="payBtn" type="button">
+        <span>Kredi satın al</span>
+        <span class="button-arrow" aria-hidden="true">→</span>
+      </button>
+
+      <div id="msg" class="status-message muted" role="status">Hazırlanıyor...</div>
+
+      <div id="iframeBox" class="iframe-box">
+        <script src="https://www.paytr.com/js/iframeResizer.min.js"></script>
+        <iframe id="paytriframe" title="PayTR güvenli ödeme ekranı" frameborder="0" scrolling="no"></iframe>
+      </div>
+    </section>
+  </main>
+
+  <aside class="floating-cart" id="floatingCart" aria-live="polite">
+    <div>
+      <span>Sepetim</span>
+      <strong><b id="cartCredits">75</b> kredi</strong>
+      <small id="cartProduct">VIP için seçildi</small>
+    </div>
+    <button class="cart-pay-button" id="cartPayBtn" type="button">Öde</button>
+  </aside>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    let selected = new URLSearchParams(location.search).get('package') || 'vip';
+    let paymentStarted = false;
+    const pkgs = document.querySelectorAll('.package-card');
+    const creditsInput = document.getElementById('credits');
+    const basketCredits = document.getElementById('basketCredits');
+    const totalTl = document.getElementById('totalTl');
+    const cartCredits = document.getElementById('cartCredits');
+    const cartProduct = document.getElementById('cartProduct');
+
+    const productNames = {
+      vip: 'VIP',
+      vipplus: 'VIP+',
+      mvip: 'MVIP',
+      mvipplus: 'MVIP+',
+      sponsor: 'Sponsor',
+      cyanidecase: 'Cyanide Kasası',
+      vipcase: 'VIP Kasası',
+      kitcase: 'Kit Kasası',
+      pickaxecase: 'Kazma Kasası',
+    };
+
+    function saveCart(credits) {
+      localStorage.setItem('cnw_cart_credits', String(credits));
+      localStorage.setItem('cnw_cart_product', selected || 'custom');
+      localStorage.setItem('cnw_cart_updated_at', new Date().toISOString());
+      window.dispatchEvent(new Event('cnw-cart-updated'));
+    }
+
+    function updateTotals() {
+      const credits = Math.max(1, Math.floor(Number(creditsInput.value || 1)));
+      creditsInput.value = credits;
+      basketCredits.textContent = credits;
+      totalTl.textContent = `${credits} TL`;
+      cartCredits.textContent = credits;
+      cartProduct.textContent = selected && productNames[selected] ? `${productNames[selected]} için seçildi` : 'Özel kredi miktarı';
+      saveCart(credits);
+    }
+
+    function setSelected(id, credits) {
+      selected = id;
+      pkgs.forEach((p) => {
+        const active = p.dataset.product === id;
+        p.classList.toggle('active', active);
+        p.setAttribute('aria-pressed', String(active));
+      });
+      if (credits) creditsInput.value = credits;
+      updateTotals();
+    }
+
+    pkgs.forEach((p) => p.onclick = () => setSelected(p.dataset.product, p.dataset.credits));
+    creditsInput.addEventListener('input', () => {
+      selected = 'custom';
+      pkgs.forEach((p) => p.classList.remove('active'));
+      updateTotals();
+    });
+    const first = document.querySelector(`[data-product="${selected}"]`) || document.querySelector('[data-product="vip"]');
+    const savedCredits = Number(localStorage.getItem('cnw_cart_credits') || 0);
+    const savedProduct = localStorage.getItem('cnw_cart_product');
+    if (new URLSearchParams(location.search).get('cart') === '1' && savedCredits > 0) {
+      const savedCard = savedProduct ? document.querySelector(`[data-product="${savedProduct}"]`) : null;
+      selected = savedProduct || 'custom';
+      creditsInput.value = savedCredits;
+      pkgs.forEach((p) => p.classList.toggle('active', savedCard && p === savedCard));
+      updateTotals();
+      document.getElementById('odeme')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      setSelected(first.dataset.product, first.dataset.credits);
+    }
+
+    document.getElementById('cartPayBtn').addEventListener('click', () => {
+      history.replaceState(null, '', '#odeme');
+      document.getElementById('odeme')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.getElementById('email')?.focus({ preventScroll: true });
+    });
+
+    document.querySelectorAll('a[href]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        const target = new URL(link.href, location.href);
+        const leavingMarket = target.pathname !== '/payment.html';
+        if (leavingMarket && !paymentStarted && !confirm('Satın almaktan vazgeçmek istediğinize emin misiniz?')) {
+          event.preventDefault();
+        }
+      });
+    });
+
+    document.getElementById('payBtn').onclick = async () => {
+      const msg = document.getElementById('msg');
+      paymentStarted = true;
+      msg.style.display = 'flex';
+      msg.className = 'status-message muted loading';
+      msg.textContent = 'Sipariş hazırlanıyor...';
+      document.getElementById('iframeBox').style.display = 'none';
+
+      try {
+        const res = await fetch('/api/paytr/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            selected_product: selected,
+            credits: Number(creditsInput.value),
+            email: document.getElementById('email').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Ödeme başlatılamadı.');
+        if (data.redirect) {
+          msg.className = 'status-message ok';
+          msg.textContent = 'Test siparişi oluşturuldu, teslimat sayfasına yönlendiriliyorsun...';
+          location.href = data.redirect;
+          return;
+        }
+
+        const iframe = document.getElementById('paytriframe');
+        iframe.src = 'https://www.paytr.com/odeme/guvenli/' + encodeURIComponent(data.token);
+        document.getElementById('iframeBox').style.display = 'block';
+        msg.className = 'status-message ok';
+        msg.textContent = 'Ödeme ekranı açıldı. Sipariş no: ' + data.merchant_oid;
+        if (window.iFrameResize) iFrameResize({}, '#paytriframe');
+      } catch (e) {
+        paymentStarted = false;
+        msg.className = 'status-message err';
+        msg.textContent = e.message;
+      }
+    };
+  </script>
+</body>
+</html>

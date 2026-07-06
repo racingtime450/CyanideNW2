@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Cezalar</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/">Ana sayfa</a>
+    <a href="/payment.html">Market</a>
+    <a href="/basvuru.html">Başvuru</a>
+    <a href="/destek.html">Destek</a>
+    <a href="/cezalar.html" class="nav-btn active">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+  <section class="hero compact-hero"><div class="hero-content"><span class="hero-badge">Ceza kayıtları</span><div class="hero-logo">CN</div></div></section>
+  <main class="main-content">
+    <div class="container">
+      <div class="breadcrumb">Ana sayfa › <span>Ceza</span></div>
+      <div class="cards-grid punishment-grid">
+        <button class="card-item punishment-tab active" type="button" data-punishment="ban"><div class="icon">X</div><h3>BANLAR</h3></button>
+        <button class="card-item punishment-tab" type="button" data-punishment="mute"><div class="icon">M</div><h3>SUSTURULMALAR</h3></button>
+        <button class="card-item punishment-tab" type="button" data-punishment="kick"><div class="icon">K</div><h3>ATILMALAR</h3></button>
+        <button class="card-item punishment-tab" type="button" data-punishment="warn"><div class="icon">!</div><h3>UYARILAR</h3></button>
+      </div>
+
+      <div class="data-table-wrap punishment-panel">
+        <div class="data-table-header">
+          <h2 id="punishmentTitle">Banlar</h2>
+          <span class="status-pill">0 kayıt</span>
+        </div>
+        <table class="data-table" aria-label="Ceza kayıtları">
+          <thead>
+            <tr>
+              <th>Oyuncu</th>
+              <th>Sebep</th>
+              <th>Yetkili</th>
+              <th>Tarih</th>
+            </tr>
+          </thead>
+          <tbody id="punishmentRows"></tbody>
+        </table>
+        <div class="empty-state" id="punishmentEmpty">Ban kaydı bulunamadı.</div>
+      </div>
+    </div>
+  </main>
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

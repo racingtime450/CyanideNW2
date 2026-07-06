@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CyanideNW - Profil</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="profile-page">
+  <nav class="top-nav">
+    <a href="/">Ana sayfa</a>
+    <a href="/payment.html">Market</a>
+    <a href="/basvuru.html">Başvuru</a>
+    <a href="/destek.html">Destek</a>
+    <a href="/cezalar.html" class="nav-btn">Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <main class="profile-shell">
+    <aside class="profile-sidebar">
+      <section class="profile-user-card">
+        <img class="profile-avatar" id="profileAvatar" src="https://mc-heads.net/avatar/Steve/64" alt="">
+        <div>
+          <h1 id="profileName">Profil</h1>
+          <span id="profileRole">Oyuncu</span>
+        </div>
+      </section>
+
+      <section class="profile-side-group">
+        <h2>Hesabım</h2>
+        <a class="profile-side-link active" href="#profileDetails">Profil</a>
+        <a class="profile-side-link" href="#profileOrders">Siparişler</a>
+        <a class="profile-side-link" href="#profileSupport">Destek Talepleri</a>
+        <a class="profile-side-link" href="#profileApplications">Başvurular</a>
+      </section>
+
+      <section class="profile-side-group">
+        <h2>Ayarlar</h2>
+        <button class="profile-side-link" type="button">Profil Düzenle</button>
+        <button class="profile-side-link" type="button">Güvenlik</button>
+      </section>
+    </aside>
+
+    <section class="profile-main">
+      <div class="breadcrumb">Ana sayfa › <span>Profil</span></div>
+
+      <section class="profile-panel" id="profileDetails">
+        <div class="data-table-header">
+          <h2>Detaylar</h2>
+          <span class="status-pill">Hesap</span>
+        </div>
+        <div class="profile-detail-grid">
+          <p><strong>Bakiye:</strong> <span id="profileBalance">0.00 TL</span></p>
+          <p><strong>Yetki:</strong> <span id="profileRoleDetail">Oyuncu</span></p>
+          <p><strong>E-Posta:</strong> <span id="profileEmail">-</span></p>
+          <p><strong>Kayıt Tarihi:</strong> <span id="profileCreated">-</span></p>
+          <p><strong>İki Adımlı Doğrulama:</strong> <span id="profileTwoFactor">Devre dışı</span></p>
+        </div>
+      </section>
+
+      <section class="profile-panel" id="profileSupport">
+        <div class="data-table-header">
+          <h2>Destek Talepleri</h2>
+          <a class="btn-secondary small-button" href="/destek.html">Destek aç</a>
+        </div>
+        <div class="profile-list" id="profileSupportList"></div>
+      </section>
+
+      <section class="profile-panel" id="profileApplications">
+        <div class="data-table-header">
+          <h2>Başvurular</h2>
+          <a class="btn-secondary small-button" href="/basvuru.html">Başvuru aç</a>
+        </div>
+        <div class="profile-list" id="profileApplicationList"></div>
+      </section>
+
+      <section class="profile-panel" id="profileOrders">
+        <div class="data-table-header">
+          <h2>Siparişler</h2>
+          <a class="btn-secondary small-button" href="/payment.html">Markete git</a>
+        </div>
+        <div class="profile-list" id="profileOrderList"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

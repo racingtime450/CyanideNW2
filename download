@@ -1,0 +1,134 @@
+function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem('cnw_user') || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function getUserToken() {
+  return localStorage.getItem('cnw_user_token') || '';
+}
+
+function setUser(user, token) {
+  localStorage.setItem('cnw_user', JSON.stringify(user));
+  if (token) localStorage.setItem('cnw_user_token', token);
+}
+
+function userAuthHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + getUserToken(),
+  };
+}
+
+function logout() {
+  localStorage.removeItem('cnw_user');
+  localStorage.removeItem('cnw_user_token');
+  location.href = '/';
+}
+
+function avatarUrl(username, size = 32) {
+  return `https://mc-heads.net/avatar/${encodeURIComponent(username || 'Steve')}/${size}`;
+}
+
+function getCartCredits() {
+  return Math.max(0, Math.floor(Number(localStorage.getItem('cnw_cart_credits') || 0)));
+}
+
+function closeProfileMenus() {
+  document.querySelectorAll('.profile-menu-root.open').forEach((root) => root.classList.remove('open'));
+}
+
+function makeProfileMenu(user, variant = 'nav') {
+  const root = document.createElement('div');
+  root.className = `profile-menu-root profile-menu-${variant}`;
+  root.innerHTML = `
+    <button class="profile-chip" type="button" aria-haspopup="true" aria-expanded="false">
+      <img class="avatar" src="${avatarUrl(user.username)}" alt="">
+      <span>${user.username}</span>
+    </button>
+    <div class="profile-popover" role="menu">
+      <div class="profile-popover-grid">
+        <a href="/profile.html" class="profile-menu-item" role="menuitem">
+          <span class="profile-menu-icon">P</span>
+          <strong>Profil</strong>
+        </a>
+        <a href="/payment.html" class="profile-menu-item" role="menuitem">
+          <span class="profile-menu-icon">0</span>
+          <strong>0.00 TL</strong>
+          <small>Bakiye</small>
+        </a>
+        <a href="/payment.html?cart=1#odeme" class="profile-menu-item profile-cart-link" role="menuitem">
+          <span class="profile-menu-icon">S</span>
+          <strong>Sepetim</strong>
+          <small><span class="profile-cart-credits">${getCartCredits()}</span> kredi</small>
+        </a>
+        <button class="profile-menu-item" type="button" role="menuitem">
+          <span class="profile-menu-icon">C</span>
+          <strong>Çarkıfelek</strong>
+        </button>
+        <button class="profile-menu-item" type="button" role="menuitem">
+          <span class="profile-menu-icon">H</span>
+          <strong>Hediye</strong>
+        </button>
+      </div>
+      <button class="profile-logout" type="button">Çıkış Yap</button>
+    </div>
+  `;
+
+  const chip = root.querySelector('.profile-chip');
+  chip.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const willOpen = !root.classList.contains('open');
+    closeProfileMenus();
+    root.classList.toggle('open', willOpen);
+    chip.setAttribute('aria-expanded', String(willOpen));
+  });
+  root.querySelector('.profile-logout').addEventListener('click', logout);
+  root.querySelectorAll('button.profile-menu-item').forEach((button) => {
+    button.addEventListener('click', () => closeProfileMenus());
+  });
+  return root;
+}
+
+function refreshProfileCartBadges() {
+  document.querySelectorAll('.profile-cart-credits').forEach((item) => {
+    item.textContent = getCartCredits();
+  });
+}
+
+function hydrateProfileMenu() {
+  const user = getUser();
+  const nav = document.querySelector('.top-nav, .market-nav');
+  const register = document.querySelector('.nav-register');
+  const login = document.querySelector('.nav-login');
+
+  if (!user || !getUserToken()) {
+    document.getElementById('heroUser')?.addEventListener('click', () => {
+      location.href = '/login.html';
+    });
+    return;
+  }
+
+  register?.remove();
+  login?.remove();
+  if (nav && !nav.querySelector('.profile-menu-root')) {
+    nav.appendChild(makeProfileMenu(user, 'nav'));
+  }
+
+  const heroUser = document.getElementById('heroUser');
+  if (heroUser) {
+    heroUser.innerHTML = '';
+    heroUser.appendChild(makeProfileMenu(user, 'hero'));
+  }
+  refreshProfileCartBadges();
+}
+
+document.addEventListener('click', closeProfileMenus);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeProfileMenus();
+});
+document.addEventListener('DOMContentLoaded', hydrateProfileMenu);
+window.addEventListener('storage', refreshProfileCartBadges);
+window.addEventListener('cnw-cart-updated', refreshProfileCartBadges);

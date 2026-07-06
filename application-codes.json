@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CnayineNW - Anasayfa</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="/" class="active">🏠 Anasayfa</a>
+    <a href="#">💳 Kredi Yükle</a>
+    <a href="#">📋 Başvuru</a>
+    <a href="/destek.html">🎧 Destek</a>
+    <a href="/cezalar.html" class="nav-btn">⚠ Cezalar</a>
+    <a href="/register.html" class="nav-register">Kayıt Ol</a>
+    <a href="/login.html" class="nav-login">Giriş Yap</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-content">
+      <span class="hero-badge" id="playerCount">0 oyuncu aktif</span>
+      <div class="hero-logo">CN</div>
+      <div class="hero-user" id="heroUser">
+        <img class="avatar" src="https://mc-heads.net/avatar/Steve/32" alt="">
+        <span id="heroUsername">Misafir</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="wave-divider">
+    <svg viewBox="0 0 1440 40" preserveAspectRatio="none">
+      <path d="M0,20 C360,40 720,0 1080,20 C1260,30 1380,35 1440,20 L1440,40 L0,40 Z" fill="white"/>
+    </svg>
+    <div class="wave-bar">
+      <div class="wave-bar-item">
+        <div>
+          <div class="label">CnayineNW</div>
+          <div class="value" id="serverIp">play.cnayinenw.net</div>
+        </div>
+        <button class="wave-bar-btn" onclick="copyIP()">👑 SUNUCU ADRESİNİ KOPYALA</button>
+      </div>
+      <div class="wave-bar-item">
+        <div>
+          <div class="label">Discord</div>
+          <div class="value">OYUNA KATIL!</div>
+        </div>
+        <button class="wave-bar-btn">💬 Discord</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main-content">
+    <div class="container">
+      <div class="welcome-section">
+        <h1>CnayineNW'e Hoş Geldiniz!</h1>
+        <p>Türkiye'nin en iyi Minecraft deneyimini yaşamak için hemen kayıt olun.</p>
+        <div class="welcome-buttons">
+          <a href="/register.html" class="btn-primary">Kayıt Ol</a>
+          <a href="/login.html" class="btn-secondary">Giriş Yap</a>
+        </div>
+      </div>
+
+      <div class="cards-grid" style="margin-top: 2rem;">
+        <a href="/cezalar.html" class="card-item">
+          <div class="icon">🚫</div>
+          <h3>BANLAR</h3>
+        </a>
+        <a href="/cezalar.html" class="card-item">
+          <div class="icon">🔇</div>
+          <h3>SUSTURULMALAR</h3>
+        </a>
+        <a href="/cezalar.html" class="card-item">
+          <div class="icon">🚪</div>
+          <h3>ATILMALAR</h3>
+        </a>
+        <a href="/cezalar.html" class="card-item">
+          <div class="icon">⚠️</div>
+          <h3>UYARILAR</h3>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <div class="recent-bar">
+    <div class="recent-bar-left">
+      <h3>Son Kayıtlar</h3>
+      <p id="totalUsers">Sunucumuza 0 oyuncu kayıt oldu!</p>
+    </div>
+    <div class="recent-bar-right" id="recentUsers">
+      <div class="recent-user">
+        <img class="avatar" src="https://mc-heads.net/avatar/Steve/40" alt="">
+        <div class="name">Henüz yok</div>
+        <div class="time">-</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <h4>Hakkımızda</h4>
+        <p>CnayineNW, Türkiye'nin en kaliteli Minecraft sunucularından biridir. Oyuncularımıza en iyi deneyimi sunmak için sürekli gelişiyoruz. CnayineNW, Mojang AB ile bağlantılı değildir.</p>
+      </div>
+      <div>
+        <h4>Bağlantılar</h4>
+        <ul>
+          <li><a href="#">KVKK Metni</a></li>
+          <li><a href="#">Hizmet Şartları</a></li>
+          <li><a href="#">Gizlilik Politikası</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Sosyal Medya</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">TikTok</a></li>
+          <li><a href="#">Discord</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Bizimle Çalışmak İster misin?</h4>
+        <ul>
+          <li><a href="#">Yetkili Başvuru Formu</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-social">
+        <a href="#">📷</a>
+        <a href="#">🎵</a>
+        <a href="#">💬</a>
+        <span style="margin-left: 1rem;">🇹🇷 Türkçe</span>
+      </div>
+      <span>Powered by CnayineNW</span>
+    </div>
+  </footer>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

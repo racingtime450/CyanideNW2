@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CyanideNW Market - Ödeme</title>
+  <style>
+    body{margin:0;background:#050816;color:#eef7ff;font-family:Arial,Helvetica,sans-serif}a{color:#72e7ff}.wrap{max-width:980px;margin:0 auto;padding:28px}.card{background:linear-gradient(145deg,#0b1027,#101b3f);border:1px solid rgba(114,231,255,.25);border-radius:20px;padding:22px;box-shadow:0 0 30px rgba(0,210,255,.08)}h1{margin:0 0 8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin:18px 0}.pkg{cursor:pointer;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:18px;background:#080d20}.pkg.active{border-color:#72e7ff;box-shadow:0 0 0 2px rgba(114,231,255,.2)}.price{font-size:28px;font-weight:700;margin-top:10px}.row{display:grid;gap:8px;margin:12px 0}input,button{font-size:16px;border-radius:12px;border:0;padding:13px}input{background:#061024;color:white;border:1px solid rgba(255,255,255,.15)}button{cursor:pointer;background:#27d8ff;color:#00121a;font-weight:700}.muted{color:#9fb0c6}.err{color:#ff8d8d}.ok{color:#86ffb2}.iframeBox{margin-top:20px;display:none}.loader{display:none;margin-top:12px}.back{display:inline-block;margin-bottom:16px;text-decoration:none}</style>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">← Ana sayfa</a>
+    <div class="card">
+      <h1>💳 CyanideNW Market</h1>
+      <p class="muted">Minecraft kullanıcı adını yaz, paketi seç, PayTR güvenli ödeme ekranında ödemeyi tamamla.</p>
+
+      <div class="grid">
+        <div class="pkg active" data-product="vip"><h2>VIP</h2><p class="muted">Başlangıç üyelik paketi</p><div class="price">100 TL</div></div>
+        <div class="pkg" data-product="vipplus"><h2>VIP+</h2><p class="muted">Daha güçlü üyelik paketi</p><div class="price">200 TL</div></div>
+      </div>
+
+      <div class="row">
+        <label>Minecraft kullanıcı adı</label>
+        <input id="mc" maxlength="16" placeholder="Örn: RacingTime" autocomplete="username" />
+      </div>
+      <div class="row">
+        <label>E-posta</label>
+        <input id="email" type="email" placeholder="ornek@mail.com" autocomplete="email" />
+      </div>
+      <button id="payBtn">Ödemeye geç</button>
+      <div id="msg" class="loader muted">Hazırlanıyor...</div>
+
+      <div id="iframeBox" class="iframeBox">
+        <script src="https://www.paytr.com/js/iframeResizer.min.js"></script>
+        <iframe id="paytriframe" frameborder="0" scrolling="no" style="width:100%;min-height:650px"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selected = new URLSearchParams(location.search).get('package') || 'vip';
+    const pkgs = document.querySelectorAll('.pkg');
+    function setSelected(id){ selected=id; pkgs.forEach(p=>p.classList.toggle('active', p.dataset.product===id)); }
+    pkgs.forEach(p=>p.onclick=()=>setSelected(p.dataset.product));
+    setSelected(selected);
+
+    document.getElementById('payBtn').onclick = async () => {
+      const msg = document.getElementById('msg');
+      msg.style.display='block'; msg.className='loader muted'; msg.textContent='PayTR ödeme ekranı hazırlanıyor...';
+      document.getElementById('iframeBox').style.display='none';
+      try {
+        const res = await fetch('/api/paytr/create-payment', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ product:selected, minecraft_username:document.getElementById('mc').value, email:document.getElementById('email').value })
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'Ödeme başlatılamadı.');
+        const iframe = document.getElementById('paytriframe');
+        iframe.src = 'https://www.paytr.com/odeme/guvenli/' + encodeURIComponent(data.token);
+        document.getElementById('iframeBox').style.display='block';
+        msg.className='loader ok'; msg.textContent='Ödeme ekranı açıldı. Sipariş no: ' + data.merchant_oid;
+        if(window.iFrameResize) iFrameResize({}, '#paytriframe');
+      } catch(e) {
+        msg.className='loader err'; msg.textContent=e.message;
+      }
+    };
+  </script>
+</body>
+</html>
